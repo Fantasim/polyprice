@@ -63,13 +63,14 @@ export class FailHistoryList extends Collection {
         })) as TCEX[]
     }
 
-    add = (pair: Pair, cex: TCEX, code: number) => {
+    add = (pair: Pair, cex: TCEX, code: number, log?: (o: any) => void) => {
         const ph: IFailHistory ={
             pair_id: `${pair.get().id()}-${cex}`,
             time: Date.now() / 1000,
             code: code
         }
         
+        log && log(`Fail history added for ${pair.get().id()} with code ${code}`)
         return this.prepend([ph])
     }
 }

@@ -21,10 +21,10 @@ export class Pair extends Model {
         return !lastPrice || lastPrice.wasItMoreThanTimeAgo(interval)
     }   
 
-    fetchLastPriceIfNeeded = (cexes: CEXList, history: PriceHistoryList, interval: number) =>{
+    fetchLastPriceIfNeeded = (cexes: CEXList, history: PriceHistoryList, interval: number, log?: ((o: any) => void)) =>{
         if (this.needToBeFetched(history, interval)){
             const cex = cexes.pickCEXForPair(this)
-            return cex ? cex.fetchPrice(this, history) : null
+            return cex ? cex.fetchPrice(this, history, log) : null
         }
         return null
     }

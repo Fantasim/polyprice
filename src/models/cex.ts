@@ -53,7 +53,7 @@ class CEX extends Model {
         }
     }
 
-    fetchPrice = async (pair: Pair, priceHistoryList: PriceHistoryList) => {
+    fetchPrice = async (pair: Pair, priceHistoryList: PriceHistoryList, log?: (o: any) => void) => {
         const endpointURL = this.get().endpoint(pair)
         const controller = new AbortController();
         const signal = controller.signal;
@@ -63,7 +63,9 @@ class CEX extends Model {
 
         try {
             this._requestCount++
+            log && log(`Fetching price from ${this.get().name()} for ${pair.get().symbol0()}-${pair.get().symbol1()}`)
             const response: Response = typeof window !== 'undefined' ? await fetch(endpointURL, {signal}) : await require('node-fetch')(endpointURL, {signal}) as Response
+            log && log(`Response status from ${this.get().name()} for ${pair.get().symbol0()}-${pair.get().symbol1()}: ${response.status}`)
             if (response.status === 200){
                 const json = await response.json()
                 let unparsedPrice
@@ -99,35 +101,37 @@ class CEX extends Model {
                 }
 
                 const priceOrError = safeParsePrice(unparsedPrice)
-                if (typeof priceOrError === 'number' && code === 200)
-                    return priceHistoryList.add(priceOrError as number).store()
+                if (typeof priceOrError === 'number' && code === 200){
+                    log && log(`New price from ${this.get().name()} for ${pair.get().symbol0()}-${pair.get().symbol1()}: ${priceOrError}`)
+                    return priceHistoryList.add(priceOrError as number).store()                    
+                }
                 else if (code !== 200)
-                    return failRequestHistory.add(pair, this.get().name(), code)
+                    return failRequestHistory.add(pair, this.get().name(), code, log)
                 else
-                return failRequestHistory.add(pair, this.get().name(), UNABLE_TO_PARSE_PRICE_ERROR_CODE)
+                return failRequestHistory.add(pair, this.get().name(), UNABLE_TO_PARSE_PRICE_ERROR_CODE, log)
             } else {
                 if (response.status === 429){
                     this._disabledUntil = Date.now() + 60 * 1000 // 1 minute
                 } else if (response.status === 400){
-                    return failRequestHistory.add(pair, this.get().name(), UNFOUND_PAIR_ERROR_CODE)
+                    return failRequestHistory.add(pair, this.get().name(), UNFOUND_PAIR_ERROR_CODE, log)
                 } else if (response.status === 404){
                     if (this.get().name() === 'coinbase'){
                         const json = await response.json()
                         const keys = Object.keys(json)
                         if (keys[0] === 'message' && json[keys[0]] === 'NotFound'){
-                            return failRequestHistory.add(pair, this.get().name(), UNFOUND_PAIR_ERROR_CODE)
+                            return failRequestHistory.add(pair, this.get().name(), UNFOUND_PAIR_ERROR_CODE, log)
                         } else if (keys[0] === 'message' && json[keys[0]] === 'Unauthorized.'){
-                            return failRequestHistory.add(pair, this.get().name(), ENDPOINT_DOES_NOT_EXIST_ERROR_CODE)
+                            return failRequestHistory.add(pair, this.get().name(), ENDPOINT_DOES_NOT_EXIST_ERROR_CODE, log)
                         }
                     }
-                    return failRequestHistory.add(pair, this.get().name(), ENDPOINT_DOES_NOT_EXIST_ERROR_CODE)
+                    return failRequestHistory.add(pair, this.get().name(), ENDPOINT_DOES_NOT_EXIST_ERROR_CODE, log)
                 }
             }
         } catch (error: any) {
             if (error.name === 'AbortError') {
-                return failRequestHistory.add(pair, this.get().name(), UNABLE_TO_REACH_SERVER_ERROR_CODE)
+                return failRequestHistory.add(pair, this.get().name(), UNABLE_TO_REACH_SERVER_ERROR_CODE, log)
             } else {
-                console.error('Fetch error:', error.message);
+                log && log(`Fetch error from ${this.get().name()} for ${pair.get().symbol0()}-${pair.get().symbol1()}: ${error.message}`)
             }
         } finally{
             clearTimeout(timeoutId);
