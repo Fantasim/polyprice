@@ -4,13 +4,8 @@ import { Pair, PairList } from './models/pair'
 import { PriceHistoryList } from './models/price-history'
 import { CEX_LIST } from './constant'
 import { failRequestHistory } from './models/fail-history'
-//parameters: 
-//1. acey node store
-//2 request les prix tous les combiens de temps
-//3 supprimer les prix tous les combiens de temps (0 pour jamais)
-//4 les pairs à surveiller
 
-interface PolyPriceOptions {
+export interface PolyPriceOptions {
     local_storage?: any
     ms_request_pair_price_interval?: number
     ignore_cexes?: TCEX[]
