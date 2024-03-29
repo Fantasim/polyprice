@@ -2,31 +2,34 @@ import { Model, IModelOptions, Collection } from 'acey'
 import { Pair } from './pair'
 import { PriceHistoryList } from './price-history'
 import { safeParsePrice } from '../utils'
-import { failedRequestHistory } from './failed-history'
-import { ENDPOINT_DOES_NOT_EXIST_ERROR_CODE, UNABLE_TO_PARSE_PRICE_ERROR_CODE, UNABLE_TO_REACH_SERVER_ERROR_CODE, UNFOUND_PAIR_ERROR_CODE } from '../constant'
+import { failRequestHistory } from './fail-history'
+import { ENDPOINT_DOES_NOT_EXIST_ERROR_CODE, RETRY_LOOKING_FOR_PAIR_INTERVAL, UNABLE_TO_PARSE_PRICE_ERROR_CODE, UNABLE_TO_REACH_SERVER_ERROR_CODE, UNFOUND_PAIR_ERROR_CODE } from '../constant'
 
 export type TCEX  = 'binance' | 'coinbase' | 'kraken' | /* 'bitfinex' | 'bitstamp' | */ 'gemini' | 'kucoin'
 
 interface ICEX_State {
     name: TCEX
-    last_activity: number
 }
 
 const DEFAULT_STATE: ICEX_State = {
-    name: 'binance',
-    last_activity: 0
+    name: 'binance'
 }
 
 class CEX extends Model {
+
+    private _requestCount = 0
+    private _disabledUntil = 0
 
     constructor(state: ICEX_State = DEFAULT_STATE, options: IModelOptions) {
         super(state, options)
     }
 
+    isDisabled = () => Date.now() < this._disabledUntil
+
     get = () => {
         return {
+            requestCount: (): number => this._requestCount,
             name: (): TCEX => this.state.name,
-            lastActivity: (): Date => new Date(this.state.last_activity * 1000),
             endpoint: (pair: Pair): string => {
                 switch (this.get().name()) {
                     case 'binance':
@@ -59,6 +62,7 @@ class CEX extends Model {
         const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
         try {
+            this._requestCount++
             const response: Response = typeof window !== 'undefined' ? await fetch(endpointURL, {signal}) : await require('node-fetch')(endpointURL, {signal}) as Response
             if (response.status === 200){
                 const json = await response.json()
@@ -96,39 +100,39 @@ class CEX extends Model {
 
                 const priceOrError = safeParsePrice(unparsedPrice)
                 if (typeof priceOrError === 'number' && code === 200)
-                    return priceHistoryList.add(pair, this.get().name(), priceOrError as number)
+                    return priceHistoryList.add(priceOrError as number).store()
                 else if (code !== 200)
-                    return failedRequestHistory.add(pair, this.get().name(), code)
+                    return failRequestHistory.add(pair, this.get().name(), code)
                 else
-                return failedRequestHistory.add(pair, this.get().name(), UNABLE_TO_PARSE_PRICE_ERROR_CODE)
+                return failRequestHistory.add(pair, this.get().name(), UNABLE_TO_PARSE_PRICE_ERROR_CODE)
             } else {
-                if (response.status === 400){
-                    return failedRequestHistory.add(pair, this.get().name(), UNFOUND_PAIR_ERROR_CODE)
+                if (response.status === 429){
+                    this._disabledUntil = Date.now() + 60 * 1000 // 1 minute
+                } else if (response.status === 400){
+                    return failRequestHistory.add(pair, this.get().name(), UNFOUND_PAIR_ERROR_CODE)
                 } else if (response.status === 404){
                     if (this.get().name() === 'coinbase'){
                         const json = await response.json()
                         const keys = Object.keys(json)
                         if (keys[0] === 'message' && json[keys[0]] === 'NotFound'){
-                            return failedRequestHistory.add(pair, this.get().name(), UNFOUND_PAIR_ERROR_CODE)
+                            return failRequestHistory.add(pair, this.get().name(), UNFOUND_PAIR_ERROR_CODE)
                         } else if (keys[0] === 'message' && json[keys[0]] === 'Unauthorized.'){
-                            return failedRequestHistory.add(pair, this.get().name(), ENDPOINT_DOES_NOT_EXIST_ERROR_CODE)
+                            return failRequestHistory.add(pair, this.get().name(), ENDPOINT_DOES_NOT_EXIST_ERROR_CODE)
                         }
                     }
-                    return failedRequestHistory.add(pair, this.get().name(), ENDPOINT_DOES_NOT_EXIST_ERROR_CODE)
+                    return failRequestHistory.add(pair, this.get().name(), ENDPOINT_DOES_NOT_EXIST_ERROR_CODE)
                 }
             }
         } catch (error: any) {
             if (error.name === 'AbortError') {
-                return failedRequestHistory.add(pair, this.get().name(), UNABLE_TO_REACH_SERVER_ERROR_CODE)
+                return failRequestHistory.add(pair, this.get().name(), UNABLE_TO_REACH_SERVER_ERROR_CODE)
             } else {
                 console.error('Fetch error:', error.message);
             }
         } finally{
             clearTimeout(timeoutId);
         }
-    
     }
-
 }
 
 export class CEXList extends Collection {
@@ -137,9 +141,20 @@ export class CEXList extends Collection {
         super(state, [CEX, CEXList], options)
     }
 
-    findByName = (name: TCEX) => {
-        return this.find((cex: CEX) => cex.get().name() === name)
+    excludeCEXes = (cexes: TCEX[]) => {
+        return this.filter((cex: CEX) => !cexes.includes(cex.get().name())) as CEXList
     }
+
+    filterByEnabled = () => this.filter((cex: CEX) => !cex.isDisabled()) as CEXList
+
+    pickCEXForPair = (pair: Pair): CEX | null => {
+        const unsupportedCEXes = failRequestHistory.filterByPairAndCodeAfterTime(pair, UNFOUND_PAIR_ERROR_CODE, RETRY_LOOKING_FOR_PAIR_INTERVAL).uniqueCEXes()
+        const cex = this.filterByEnabled().excludeCEXes(unsupportedCEXes).orderByRequestCountAsc().first()
+        return cex as CEX || null
+    }
+
+    orderByRequestCountAsc = () => this.orderBy((c: CEX) => c.get().requestCount(), 'asc') as CEXList
+    findByName = (name: TCEX) => this.find((cex: CEX) => cex.get().name() === name) || null
 }
 
 export const newCexList = (list: TCEX[]) => {

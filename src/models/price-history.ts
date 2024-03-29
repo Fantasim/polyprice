@@ -3,13 +3,11 @@ import { TCEX } from './cex'
 import { Pair } from './pair'
 
 interface IPriceHistory {
-    pair_id: string
     price: number
     time: number
 }
 
 const DEFAULT_STATE: IPriceHistory = {
-    pair_id: '',
     price: 0,
     time: 0
 }
@@ -22,10 +20,13 @@ export class PriceHistory extends Model {
 
     get = () => {
         return {
-            pairID: (): string => this.state.pair_id,
             price: (): number => this.state.price,
             time: (): Date => new Date(this.state.time * 1000)
         }
+    }
+
+    wasItMoreThanTimeAgo = (time: number) => {
+        return (Date.now() - this.get().time().getTime()) > time
     }
 }
 
@@ -35,13 +36,35 @@ export class PriceHistoryList extends Collection {
         super(state, [PriceHistory, PriceHistoryList], options)
     }
 
-    add = (pair: Pair, cex: TCEX, price: number) => {
+    removePriceBeforeTime = (limit: number) => {
+        let count = 0
+        this.deleteBy((priceHistory: PriceHistory) => {
+            if (priceHistory.get().time().getTime() < limit){
+                count++
+                return true
+            }
+            return false
+        })
+        count > 0 && this.action().store()
+    }
+
+
+    filterAfterTime = (after: number) => {
+        return this.filter((priceHistory: PriceHistory) => {
+            return priceHistory.get().time().getTime() > after
+        }) as PriceHistoryList
+    }
+
+    findLastPrice = (): PriceHistory | null => {
+        return this.first() as PriceHistory || null
+    }
+
+    add = (price: number) => {
         const ph: IPriceHistory ={
-            pair_id: `${pair.get().id()}-${cex}`,
-            price: price,
+            price,
             time: Date.now() / 1000
         }
         
-        return this.push(ph)
+        return this.prepend([ph])
     }
 }
