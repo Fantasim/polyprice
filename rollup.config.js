@@ -9,7 +9,6 @@ const config = {
     output: [
         {
             globals: {
-                'lodash': '_',
                 'acey': 'acey',
             },
             file: "dist/index.js",

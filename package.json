@@ -11,28 +11,31 @@
     "build": "yarn clean && NODE_ENV=production rollup -c",
     "clean": "rm -rf dist",
     "cleanf": "yarn clean && rm -rf node_modules",
-    "test": "mocha -r ts-node/register test/index.ts --timeout 20000"
+    "test": "mocha --require ts-node/register test/index.ts --timeout 20000"
   },
   "repository": "https://github.com/Fantasim/minicall.git",
   "license": "MIT",
   "devDependencies": {
     "@rollup/plugin-commonjs": "^25.0.7",
-    "@types/chai": "^4.3.14",
-    "@types/lodash": "^4.17.0",
-    "@types/mocha": "^10.0.6",
-    "@types/node": "^20.11.30",
+    "@types/chai": "^4.3.4",
+    "@types/mocha": "^10.0.1",
+    "@types/node": "^18.11.18",
     "acey-node-store": "^1.0.6",
-    "chai": "^5.1.0",
-    "mocha": "^10.4.0",
+    "chai": "^4.3.7",
+    "mocha": "^10.2.0",
     "rollup": "^4.13.2",
+    "rollup-plugin-peer-deps-external": "^2.2.4",
     "rollup-plugin-typescript2": "^0.36.0",
     "rollup-plugin-uglify": "^6.0.4",
-    "ts-node": "^10.9.2",
+    "ts-node": "^10.9.1",
     "typescript": "^5.4.3"
   },
   "dependencies": {
     "acey": "^1.6.1",
     "node-fetch": "^3.3.2"
+  },
+  "peerDependencies": {
+    "acey": "^1.6.1"
   },
   "browser": {
     "node-fetch": false

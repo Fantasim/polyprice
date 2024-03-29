@@ -153,7 +153,7 @@ export class CEXList extends Collection {
 
     pickCEXForPair = (pair: Pair): CEX | null => {
         const unsupportedCEXes = failRequestHistory.filterByPairAndCodeAfterTime(pair, UNFOUND_PAIR_ERROR_CODE, RETRY_LOOKING_FOR_PAIR_INTERVAL).uniqueCEXes()
-        const cex = this.filterByEnabled().excludeCEXes(unsupportedCEXes).orderByRequestCountAsc().first()
+        const cex = this.filterByEnabled().excludeCEXes(unsupportedCEXes as TCEX[]).orderByRequestCountAsc().first()
         return cex as CEX || null
     }
 

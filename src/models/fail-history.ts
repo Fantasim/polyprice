@@ -1,7 +1,6 @@
 import { Collection, IModelOptions, Model } from 'acey'
 import { TCEX } from './cex'
 import { Pair } from './pair'
-import _ from 'lodash'
 
 interface IFailHistory {
     pair_id: string
@@ -57,10 +56,13 @@ export class FailHistoryList extends Collection {
     }
 
     uniqueCEXes = () => {
-        return _.uniq(this.map((fh: FailHistory) => {
+        const obj: {[key: string]: boolean} = {}
+        this.map((fh: FailHistory) => {
             const s = fh.get().pairID().split('-')
-            return s[s.length - 1]
-        })) as TCEX[]
+            obj[s[s.length - 1] as TCEX] = true
+        })
+        
+        return Object.keys(obj) as TCEX[]
     }
 
     add = (pair: Pair, cex: TCEX, code: number, log?: (o: any) => void) => {
