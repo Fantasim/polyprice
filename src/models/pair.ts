@@ -3,6 +3,7 @@ import { PriceHistoryList } from './price-history';
 import { failRequestHistory } from './fail-history';
 import { CEXList } from './cex';
 import { RETRY_LOOKING_FOR_PAIR_INTERVAL, UNFOUND_PAIR_ERROR_CODE } from '../constant';
+import { buildKey } from '../utils';
 
 interface IPairState {
     symbol0: string
@@ -15,6 +16,7 @@ export class Pair extends Model {
     constructor(state: IPairState, options:IModelOptions) {
         super(state, options)
     }
+    
 
     needToBeFetched = (history: PriceHistoryList, interval: number) => {
         const lastPrice = history.findLastPrice()
@@ -31,7 +33,7 @@ export class Pair extends Model {
 
     get = () => {
         return {
-            id: (): string => this.get().symbol0().toLowerCase() + '-' + this.get().symbol1().toLowerCase(),
+            id: (): string => buildKey(this.state.symbol0, this.state.symbol1),
             symbol0: (): string => this.state.symbol0,
             symbol1: (): string => this.state.symbol1,
             createdAt: (): Date => new Date(this.state.created_at * 1000)
@@ -73,7 +75,7 @@ export class PairList extends Collection {
 
     findByPair = (symbol0: string, symbol1: string) => {
         return this.find((pair: Pair) => {
-            return pair.get().symbol0() === symbol0.toUpperCase() && pair.get().symbol1() === symbol1.toUpperCase()
+            return pair.get().id() && buildKey(symbol0, symbol1)
         }) as Pair
     }
 
@@ -81,10 +83,14 @@ export class PairList extends Collection {
         if (this.findByPair(symbol0, symbol1))
             return 'pair already exists'
 
+        const lastFail = failRequestHistory.findLastByPairID(buildKey(symbol0, symbol1))
+        if (lastFail && !lastFail.wasItMoreThanAWeekAgo())
+            return 'pair already been tried and failed recently'
+
         const p: IPairState = {
             symbol0: symbol0.toUpperCase(),
             symbol1: symbol1.toUpperCase(),
-            created_at: Date.now() / 1000
+            created_at: Math.floor(Date.now() / 1000)
         }
 
         return this.push(p)

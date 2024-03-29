@@ -10,3 +10,7 @@ export const safeParsePrice = (price: any) =>{
     }
     return 'price is not a number'
 }
+
+export const buildKey = (symbol0: string, symbol1: string) => {
+    return symbol0.toLowerCase() + '-' + symbol1.toLowerCase()
+}

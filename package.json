@@ -32,12 +32,9 @@
   },
   "dependencies": {
     "acey": "^1.6.1",
-    "node-fetch": "^3.3.2"
+    "node-fetch-native": "^1.6.4"
   },
   "peerDependencies": {
     "acey": "^1.6.1"
-  },
-  "browser": {
-    "node-fetch": false
   }
 }

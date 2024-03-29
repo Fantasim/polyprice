@@ -28,6 +28,10 @@ export class FailHistory extends Model {
         }
     }
 
+    wasItMoreThanAWeekAgo = () => {
+        return (Date.now() - this.get().time().getTime()) > 7 * 24 * 60 * 60 * 1000 // 1 week
+    }
+
     wasItMoreThan60MinutesAgo = () => {
         return (Date.now() - this.get().time().getTime()) > 60 * 60 * 1000 // 1 hour
     }
@@ -43,23 +47,29 @@ export class FailHistoryList extends Collection {
         super(state, [FailHistory, FailHistoryList], options)
     }
 
+    findLastByPairID = (pair_id: string) => {
+        return this.find((FailHistory: FailHistory) => {
+            return FailHistory.get().pairID().startsWith(pair_id)
+        }) as FailHistory
+    }
+
     filterByPairAndCodeAfterTime = (pair: Pair, code: number, after: number) => {
         return this.filter((priceHistory: FailHistory) => {
             return priceHistory.get().code() === code && priceHistory.get().pairID().startsWith(pair.get().id()) && priceHistory.get().time().getTime() > after
         }) as FailHistoryList
     }
 
-    findLastByPairIDAndCode = (pair_id: string, code: number) => {
-        return this.find((FailHistory: FailHistory) => {
-            return FailHistory.get().pairID() === pair_id && FailHistory.get().code() === code
-        }) as FailHistory
-    }
+    // findLastByPairIDAndCode = (pair_id: string, code: number) => {
+    //     return this.find((FailHistory: FailHistory) => {
+    //         return FailHistory.get().pairID().startsWith(pair_id) && FailHistory.get().code() === code
+    //     }) as FailHistory
+    // }
 
     uniqueCEXes = () => {
         const obj: {[key: string]: boolean} = {}
         this.map((fh: FailHistory) => {
             const s = fh.get().pairID().split('-')
-            obj[s[s.length - 1] as TCEX] = true
+            obj[s[s.length - 1].toLowerCase() as TCEX] = true
         })
         
         return Object.keys(obj) as TCEX[]
@@ -68,7 +78,7 @@ export class FailHistoryList extends Collection {
     add = (pair: Pair, cex: TCEX, code: number, log?: (o: any) => void) => {
         const ph: IFailHistory ={
             pair_id: `${pair.get().id()}-${cex}`,
-            time: Date.now() / 1000,
+            time: Math.floor(Date.now() / 1000),
             code: code
         }
         

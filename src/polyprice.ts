@@ -30,9 +30,9 @@ export class PolyPrice {
     private _intervalPairPriceFetch: any
     private _intervalPairPriceHistoryRemove: any
 
-    private _log = (msg: string) => {
+    private _log = (...msg: any) => {
         if (this._options.logging)
-            console.log(msg)
+            console.log(...msg)
     }
 
     constructor(options: PolyPriceOptions){
@@ -74,7 +74,12 @@ export class PolyPrice {
         if (typeof err === 'string')
             return err
         err.store()
-        return this._pairList.last() as Pair
+        const pair = this._pairList.last() as Pair
+
+        const history = new PriceHistoryList([], {key: pair.get().id(), connected: true})
+        manager.connectModel(history)
+        this._priceHistoryMap[pair.get().id()] = history
+        return pair
     }
 
     private _runIntervals = () => {
@@ -85,11 +90,26 @@ export class PolyPrice {
             const list = this._pairList.filterByPriceFetchRequired(this._priceHistoryMap, fetchInterval)
             list.slice(0, 10).forEach((p: Pair) => {
                 const history = this._priceHistoryMap[p.get().id()]
-                const purged = this._pairList.purgePairIfUnfound(p, this._priceHistoryMap[p.get().id()], this._cexList.count())
+                const key = p.get().id()
+                const purged = this._pairList.purgePairIfUnfound(p, this._priceHistoryMap[key], this._cexList.count())
                 if (!purged)
                     p.fetchLastPriceIfNeeded(this._cexList, history, fetchInterval, this._log)
-                else 
+                else {
+                    //clear the price history of the pair
                     this._log(`Pair ${p.get().id()} removed`)
+
+                    //remove the price history from the map
+                    delete this._priceHistoryMap[key] 
+                    //remove the price history from the local storage
+                    manager.localStoreManager().removeKey(key)
+
+                    this._log(`Price history of ${p.get().id()} removed`)
+
+                    const symbols = key.split('-')
+
+                    //if a pair failed, we try to add it again reversed
+                    this.addPair(symbols[1], symbols[0])
+                }
             })
         }, 20 * 1000)
 
@@ -101,7 +121,7 @@ export class PolyPrice {
             this._intervalPairPriceHistoryRemove = setInterval(this._purgePriceHistories, 60 * 60 * 1000) // 1 hour
         }
 
-        this._log('Price history remove interval: ' + rmInterval / 1000 + ' seconds')
+        this._log('Price history remove interval:', rmInterval > 0 ? rmInterval / 1000 + ' seconds' : 'never')
     }
 
     private _clearIntervals = () => {
@@ -110,10 +130,10 @@ export class PolyPrice {
         this._log('Intervals cleared')
     }
 
-    run = () => {
+    run = async () => {
         if (this._running)
             return
-        config.done()
+        await config.done()
         this._running = true
         this._purgePriceHistories()
         this._runIntervals()

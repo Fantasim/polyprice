@@ -4,6 +4,7 @@ import { PriceHistoryList } from './price-history'
 import { safeParsePrice } from '../utils'
 import { failRequestHistory } from './fail-history'
 import { ENDPOINT_DOES_NOT_EXIST_ERROR_CODE, RETRY_LOOKING_FOR_PAIR_INTERVAL, UNABLE_TO_PARSE_PRICE_ERROR_CODE, UNABLE_TO_REACH_SERVER_ERROR_CODE, UNFOUND_PAIR_ERROR_CODE } from '../constant'
+import fetch from "node-fetch-native";
 
 export type TCEX  = 'binance' | 'coinbase' | 'kraken' | /* 'bitfinex' | 'bitstamp' | */ 'gemini' | 'kucoin'
 
@@ -63,11 +64,12 @@ class CEX extends Model {
 
         try {
             this._requestCount++
-            log && log(`Fetching price from ${this.get().name()} for ${pair.get().symbol0()}-${pair.get().symbol1()}`)
-            const response: Response = typeof window !== 'undefined' ? await fetch(endpointURL, {signal}) : await require('node-fetch')(endpointURL, {signal}) as Response
-            log && log(`Response status from ${this.get().name()} for ${pair.get().symbol0()}-${pair.get().symbol1()}: ${response.status}`)
+            log && log(`Fetching price from ${this.get().name()} for ${pair.get().id()}`)
+
+            const response = await fetch(endpointURL, {signal})
+            log && log(`Response status from ${this.get().name()} for ${pair.get().id()}: ${response.status}`)
             if (response.status === 200){
-                const json = await response.json()
+                const json = await response.json() as any
                 let unparsedPrice
                 let code: number = 200
 
@@ -75,8 +77,10 @@ class CEX extends Model {
                     switch (this.get().name()) {
                         case 'binance':
                             unparsedPrice = json.price
+                            break;
                         case 'coinbase':
                             unparsedPrice = json.price
+                            break
                         case 'kraken':
                             const keys = Object.keys(json.result)
                             if (keys[0] === 'error'){
@@ -86,23 +90,28 @@ class CEX extends Model {
                             unparsedPrice = json.result[keys[0]].c[0]
                         // case 'bitfinex':
                         //     unparsedPrice = json[6]
+                        //     break
                         // case 'bitstamp':
                         //     unparsedPrice = json.last
+                        //     break
                         case 'gemini':
                             unparsedPrice = json.last
+                            break;
                         case 'kucoin':
                             if (!!json.data)
                             unparsedPrice = json.data.price
                             else
                                 code = UNFOUND_PAIR_ERROR_CODE
+                            break;
                     }
                 } catch (error) {
+                    console.log(error)
                     code = UNABLE_TO_PARSE_PRICE_ERROR_CODE
                 }
 
                 const priceOrError = safeParsePrice(unparsedPrice)
                 if (typeof priceOrError === 'number' && code === 200){
-                    log && log(`New price from ${this.get().name()} for ${pair.get().symbol0()}-${pair.get().symbol1()}: ${priceOrError}`)
+                    log && log(`New price from ${this.get().name()} for ${pair.get().id()}: ${priceOrError}`)
                     return priceHistoryList.add(priceOrError as number).store()                    
                 }
                 else if (code !== 200)
@@ -116,7 +125,7 @@ class CEX extends Model {
                     return failRequestHistory.add(pair, this.get().name(), UNFOUND_PAIR_ERROR_CODE, log)
                 } else if (response.status === 404){
                     if (this.get().name() === 'coinbase'){
-                        const json = await response.json()
+                        const json = await response.json() as any
                         const keys = Object.keys(json)
                         if (keys[0] === 'message' && json[keys[0]] === 'NotFound'){
                             return failRequestHistory.add(pair, this.get().name(), UNFOUND_PAIR_ERROR_CODE, log)
@@ -131,7 +140,7 @@ class CEX extends Model {
             if (error.name === 'AbortError') {
                 return failRequestHistory.add(pair, this.get().name(), UNABLE_TO_REACH_SERVER_ERROR_CODE, log)
             } else {
-                log && log(`Fetch error from ${this.get().name()} for ${pair.get().symbol0()}-${pair.get().symbol1()}: ${error.message}`)
+                log && log(`Fetch error from ${this.get().name()} for ${pair.get().id()}}: ${error.message}`)
             }
         } finally{
             clearTimeout(timeoutId);

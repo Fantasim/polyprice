@@ -62,7 +62,7 @@ export class PriceHistoryList extends Collection {
     add = (price: number) => {
         const ph: IPriceHistory ={
             price,
-            time: Date.now() / 1000
+            time: Math.floor(Date.now() / 1000)
         }
         
         return this.prepend([ph])
