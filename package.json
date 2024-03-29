@@ -1,0 +1,39 @@
+{
+  "name": "polyprice",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist/**"
+  ],
+  "scripts": {
+    "build": "yarn clean && NODE_ENV=production rollup -c",
+    "clean": "rm -rf dist",
+    "cleanf": "yarn clean && rm -rf node_modules",
+    "test": "mocha -r ts-node/register test/index.ts --timeout 20000"
+  },
+  "repository": "https://github.com/Fantasim/minicall.git",
+  "license": "MIT",
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^25.0.7",
+    "@types/chai": "^4.3.14",
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^20.11.30",
+    "acey-node-store": "^1.0.6",
+    "chai": "^5.1.0",
+    "mocha": "^10.4.0",
+    "rollup": "^4.13.2",
+    "rollup-plugin-typescript2": "^0.36.0",
+    "rollup-plugin-uglify": "^6.0.4",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.3"
+  },
+  "dependencies": {
+    "acey": "^1.6.1",
+    "node-fetch": "^3.3.2"
+  },
+  "browser": {
+    "node-fetch": false
+  }
+}
