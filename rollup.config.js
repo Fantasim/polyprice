@@ -3,6 +3,8 @@ import typescript from 'rollup-plugin-typescript2'
 import external from 'rollup-plugin-peer-deps-external'
 import { uglify } from 'rollup-plugin-uglify';
 import commonjs from '@rollup/plugin-commonjs';
+import json from '@rollup/plugin-json';
+import pkg from './package.json';
 
 const config = {
     input: './index.ts',
@@ -23,8 +25,11 @@ const config = {
             tsconfigOverride: { compilerOptions: { module: 'ES2020' } },
         }),
         commonjs(),
-        uglify()
+        uglify(),
+        json(),
     ]
 }
+
+pkg.type = 'module';
 
 export default config
