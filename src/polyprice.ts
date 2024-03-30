@@ -47,12 +47,19 @@ class Controller {
     addPair = (symbol0: string, symbol1: string) => {
         const { pairList, priceHistoryMap } = this
 
-        const err = pairList.add(symbol0, symbol1)
-        if (typeof err === 'string')
-            return err
-        err.store()
-        const pair = pairList.last() as Pair
+        const res = pairList.add(symbol0, symbol1)
+        //if error
+        if (typeof res === 'string'){
+            return res
+        }
+        //if the pair already exists
+        if (res instanceof Pair){
+            return res
+        }
+        //if the pair has been added
+        res.store()
 
+        const pair = pairList.last() as Pair
         const history = new PriceHistoryList([], {key: pair.get().id(), connected: true})
         manager.connectModel(history)
         priceHistoryMap[pair.get().id()] = history
@@ -146,8 +153,17 @@ export class PolyPrice {
 
     private _runIntervals = () => {
         
+        let previousCount = failRequestHistory.count()
         this._intervalPairPriceFetch = setInterval(() => {
             controller.refreshOrClearPair(this.options().priceFetchInterval())
+
+            //check if there are new fails then update the JSON DB
+            setTimeout(() => {
+                const count = failRequestHistory.count()
+                count > previousCount && failRequestHistory.action().store()
+                previousCount = count
+            }, 18_000)
+
         }, 20 * 1000)
 
         this._log('Pair price fetch interval: ' + this.options().priceFetchInterval() / 1000 + ' seconds')

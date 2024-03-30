@@ -17,7 +17,6 @@ export class Pair extends Model {
     constructor(state: IPairState, options:IModelOptions) {
         super(state, options)
     }
-    
 
     needToBeFetched = (interval: number) => {
         const lastPrice = this.get().priceHistoryList().findLastPrice()
@@ -79,13 +78,15 @@ export class PairList extends Collection {
 
     findByPair = (symbol0: string, symbol1: string) => {
         return this.find((pair: Pair) => {
-            return pair.get().id() && buildKey(symbol0, symbol1)
+            return pair.get().id() === buildKey(symbol0, symbol1)
         }) as Pair
     }
 
     add = (symbol0: string, symbol1: string) => {
-        if (this.findByPair(symbol0, symbol1))
-            return 'pair already exists'
+        const exist = this.findByPair(symbol0, symbol1)
+        if (exist){
+            return exist
+        }
 
         const lastFail = failRequestHistory.findLastByPairID(buildKey(symbol0, symbol1))
         if (lastFail && !lastFail.wasItMoreThanATimeAgo(RETRY_LOOKING_FOR_PAIR_INTERVAL))

@@ -1,4 +1,4 @@
-import { ENDPOINT_DOES_NOT_EXIST_ERROR_CODE, UNABLE_TO_PARSE_PRICE_ERROR_CODE, UNABLE_TO_REACH_SERVER_ERROR_CODE, UNFOUND_PAIR_ERROR_CODE } from "./constant";
+import { ENDPOINT_DOES_NOT_EXIST_ERROR_CODE, MAX_REQUESTS_REACHED_ERROR_CODE, UNABLE_TO_PARSE_PRICE_ERROR_CODE, UNABLE_TO_REACH_SERVER_ERROR_CODE, UNFOUND_PAIR_ERROR_CODE } from "./constant";
 import { CEX } from "./models/cex";
 import { failRequestHistory } from "./models/fail-history";
 import { Pair } from "./models/pair";
@@ -45,11 +45,11 @@ const parseResponse = async (cex: CEX, response: Response, pair: Pair, log?: (o:
             unparsedPrice = json.price;
             break;
         case 'kraken':
-            const keys = Object.keys(json.result);
-            if (keys[0] === 'error'){
+            if (json.error && json.error.length > 0){
                 code = UNFOUND_PAIR_ERROR_CODE;
                 break;
             }
+            const keys = Object.keys(json.result);
             unparsedPrice = json.result[keys[0]].c[0];
             break;
         case 'gemini':
@@ -66,9 +66,11 @@ const parseResponse = async (cex: CEX, response: Response, pair: Pair, log?: (o:
     const priceOrError = safeParsePrice(unparsedPrice);
     if (typeof priceOrError === 'number' && code === 200) {
         log && log(`New price from ${cex.get().name()} for ${pair.get().id()}: ${priceOrError}`);
-        return pair.get().priceHistoryList().add(priceOrError, cex.get().name()).store();
+        pair.get().priceHistoryList().add(priceOrError, cex.get().name()).store();
+        return {cex: cex.get().name(), price: priceOrError}
     } else {
-        return failRequestHistory.add(pair, cex.get().name(), code === 200 ? UNABLE_TO_PARSE_PRICE_ERROR_CODE : code, log);
+        failRequestHistory.add(pair, cex.get().name(), code === 200 ? UNABLE_TO_PARSE_PRICE_ERROR_CODE : code, log)
+        return code
     }
 }
 
@@ -76,27 +78,37 @@ const handleNon200Response = async (cex: CEX, response: Response, pair: Pair, lo
     switch (response.status) {
         case 429:
             cex.setDisabledUntil(Date.now() + 60 * 1000) // 1 minute
-            break;
+            return MAX_REQUESTS_REACHED_ERROR_CODE
         case 400:
-            return failRequestHistory.add(pair, cex.get().name(), UNFOUND_PAIR_ERROR_CODE, log);
+            failRequestHistory.add(pair, cex.get().name(), UNFOUND_PAIR_ERROR_CODE, log);
+            return UNFOUND_PAIR_ERROR_CODE
         case 404:
             if (cex.get().name() === 'coinbase') {
                 const json = await response.json() as any;
                 const keys = Object.keys(json);
                 if (keys[0] === 'message' && json[keys[0]] === 'NotFound') {
-                    return failRequestHistory.add(pair, cex.get().name(), UNFOUND_PAIR_ERROR_CODE, log);
-                } else if (keys[0] === 'message' && json[keys[0]] === 'Unauthorized.') {
-                    return failRequestHistory.add(pair, cex.get().name(), ENDPOINT_DOES_NOT_EXIST_ERROR_CODE, log);
+                    failRequestHistory.add(pair, cex.get().name(), UNFOUND_PAIR_ERROR_CODE, log);
+                    return UNFOUND_PAIR_ERROR_CODE
+                } else if (keys[0] === 'message' && json[keys[0]] === 'Unauthorized.' || json[keys[0]] === 'Route not found') {
+                    failRequestHistory.add(pair, cex.get().name(), ENDPOINT_DOES_NOT_EXIST_ERROR_CODE, log);
+                    return ENDPOINT_DOES_NOT_EXIST_ERROR_CODE
                 }
             }
-            return failRequestHistory.add(pair, cex.get().name(), ENDPOINT_DOES_NOT_EXIST_ERROR_CODE, log);
+            failRequestHistory.add(pair, cex.get().name(), ENDPOINT_DOES_NOT_EXIST_ERROR_CODE, log)
+            return ENDPOINT_DOES_NOT_EXIST_ERROR_CODE
+        case 401:
+            failRequestHistory.add(pair, cex.get().name(), ENDPOINT_DOES_NOT_EXIST_ERROR_CODE, log);
+            return ENDPOINT_DOES_NOT_EXIST_ERROR_CODE
     }
+    return response.status
 }
 
 const handleError = (cex: CEX, error: any, pair: Pair, log?: (o: any) => void) => {
     if (error.name === 'AbortError') {
-        return failRequestHistory.add(pair, cex.get().name(), UNABLE_TO_REACH_SERVER_ERROR_CODE, log);
+        failRequestHistory.add(pair, cex.get().name(), UNABLE_TO_REACH_SERVER_ERROR_CODE, log);
+        return UNABLE_TO_REACH_SERVER_ERROR_CODE
     } else {
         log && log(`Fetch error from ${cex.get().name()} for ${pair.get().id()}: ${error.message}`);
+        return UNABLE_TO_REACH_SERVER_ERROR_CODE
     }
 }

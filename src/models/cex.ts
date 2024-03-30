@@ -1,7 +1,7 @@
 import { Model, IModelOptions, Collection } from 'acey'
 import { Pair } from './pair'
 import { failRequestHistory } from './fail-history'
-import { RETRY_LOOKING_FOR_PAIR_INTERVAL, UNFOUND_PAIR_ERROR_CODE } from '../constant'
+import { CEX_PRICE_ENDPOINTS, ENDPOINT_DOES_NOT_EXIST_ERROR_CODE, RETRY_LOOKING_FOR_PAIR_INTERVAL, UNFOUND_PAIR_ERROR_CODE } from '../constant'
 import { fetchPrice } from '../fetching-engine'
 
 export type TCEX  = 'binance' | 'coinbase' | 'kraken' | /* 'bitfinex' | 'bitstamp' | */ 'gemini' | 'kucoin'
@@ -24,36 +24,31 @@ export class CEX extends Model {
     }
 
     isDisabled = () => Date.now() < this._disabledUntil
-    setDisabledUntil = (time: number) => this._disabledUntil = time
+    setDisabledUntil = (time: number) => {
+        if (time > Date.now() + 365 * 24 * 60 * 60 * 1000) {
+            setInterval(() => {
+                console.warn(`%c endpoint ${this.get().name()} has probably changed, fix the issue or ignore it for now in the PolyPrice options`, 'color: yellow; font-weight: bold');
+            }, 60 * 1000)
+        }
+        this._disabledUntil = time
+    }
 
     get = () => {
         return {
             requestCount: (): number => this._requestCount,
             name: (): TCEX => this.state.name,
-            endpoint: (pair: Pair): string => {
-                switch (this.get().name()) {
-                    case 'binance':
-                        return `https://api.binance.com/api/v3/ticker/price?symbol=${pair.get().symbol0()}${pair.get().symbol1()}`
-                    case 'coinbase':
-                        return `https://api.pro.coinbase.com/products/${pair.get().symbol0()}-${pair.get().symbol1()}/ticker`
-                    case 'kraken':
-                        return `https://api.kraken.com/0/public/Ticker?pair=${pair.get().symbol0()}${pair.get().symbol1()}`
-                    // case 'bitfinex': //XXX
-                    //     return `https://api-pub.bitfinex.com/v2/ticker/t${pair.get().symbol0()}${pair.get().symbol1()}`
-                    // case 'bitstamp': //XXX
-                    //     return `https://www.bitstamp.net/api/v2/ticker/${pair.get().symbol0().toLowerCase()}${pair.get().symbol1().toLowerCase()}`
-                    case 'gemini':
-                        return `https://api.gemini.com/v1/pubticker/${pair.get().symbol0().toLowerCase()}${pair.get().symbol1().toLowerCase()}`
-                    case 'kucoin':
-                        return `https://api.kucoin.com/api/v1/market/orderbook/level1?symbol=${pair.get().symbol0()}-${pair.get().symbol1()}`
-                    default:
-                        return ''
-                }
-            }
+            endpoint: (pair: Pair): string => CEX_PRICE_ENDPOINTS[this.get().name()](pair.get().symbol0(), pair.get().symbol1())
         }
     }
 
-    fetchLastPrice = (pair: Pair, log?: (o: any) => void) => fetchPrice(this, pair, log)
+    fetchLastPrice = async (pair: Pair, log?: (o: any) => void) => {
+        this._requestCount++
+        const r = await fetchPrice(this, pair, log)
+        if (typeof r === 'number' && r === ENDPOINT_DOES_NOT_EXIST_ERROR_CODE) {
+            this.setDisabledUntil(Date.now() * 2) //forever
+        }
+        return r
+    }
 }
 
 export class CEXList extends Collection {
