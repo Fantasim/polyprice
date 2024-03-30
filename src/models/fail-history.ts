@@ -28,8 +28,8 @@ export class FailHistory extends Model {
         }
     }
 
-    wasItMoreThanAWeekAgo = () => {
-        return (Date.now() - this.get().time().getTime()) > 7 * 24 * 60 * 60 * 1000 // 1 week
+    wasItMoreThanATimeAgo = (time: number) => {
+        return (Date.now() - this.get().time().getTime()) > time
     }
 
     wasItMoreThan60MinutesAgo = () => {
@@ -58,12 +58,6 @@ export class FailHistoryList extends Collection {
             return priceHistory.get().code() === code && priceHistory.get().pairID().startsWith(pair.get().id()) && priceHistory.get().time().getTime() > after
         }) as FailHistoryList
     }
-
-    // findLastByPairIDAndCode = (pair_id: string, code: number) => {
-    //     return this.find((FailHistory: FailHistory) => {
-    //         return FailHistory.get().pairID().startsWith(pair_id) && FailHistory.get().code() === code
-    //     }) as FailHistory
-    // }
 
     uniqueCEXes = () => {
         const obj: {[key: string]: boolean} = {}

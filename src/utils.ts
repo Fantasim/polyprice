@@ -1,3 +1,5 @@
+import fetch from "node-fetch-native";
+
 export const safeParsePrice = (price: any) =>{
     if (typeof price === 'number' && !isNaN(price)){
         return price 
@@ -13,4 +15,11 @@ export const safeParsePrice = (price: any) =>{
 
 export const buildKey = (symbol0: string, symbol1: string) => {
     return symbol0.toLowerCase() + '-' + symbol1.toLowerCase()
+}
+
+export const fetchWithTimeout = async (endpointURL: string, signal: AbortSignal, log?: (o: any) => void) => {
+    return Promise.race([
+        fetch(endpointURL, { signal }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
+    ]);
 }

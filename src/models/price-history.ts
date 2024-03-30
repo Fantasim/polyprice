@@ -1,15 +1,18 @@
 import { IModelOptions, Model, Collection } from 'acey'
-import { TCEX } from './cex'
+import { CEX, TCEX } from './cex'
 import { Pair } from './pair'
+import { controller } from '../polyprice'
 
 interface IPriceHistory {
     price: number
     time: number
+    cex: TCEX
 }
 
 const DEFAULT_STATE: IPriceHistory = {
     price: 0,
-    time: 0
+    time: 0,
+    cex: 'binance'
 }
 
 export class PriceHistory extends Model {
@@ -21,7 +24,9 @@ export class PriceHistory extends Model {
     get = () => {
         return {
             price: (): number => this.state.price,
-            time: (): Date => new Date(this.state.time * 1000)
+            time: (): Date => new Date(this.state.time * 1000),
+            cex: (): TCEX => this.state.cex,
+            CEX: (): CEX => controller.cexList.findByName(this.state.cex) as CEX
         }
     }
 
@@ -48,6 +53,11 @@ export class PriceHistoryList extends Collection {
         count > 0 && this.action().store()
     }
 
+    filterByCEX = (cex: TCEX) => {      
+        return this.filter((priceHistory: PriceHistory) => {
+            return priceHistory.get().cex() === cex
+        }) as PriceHistoryList
+    }
 
     filterAfterTime = (after: number) => {
         return this.filter((priceHistory: PriceHistory) => {
@@ -55,14 +65,21 @@ export class PriceHistoryList extends Collection {
         }) as PriceHistoryList
     }
 
+    findLastPriceByCEX = (cex: TCEX): PriceHistory | null => {
+        return this.find((priceHistory: PriceHistory) => {
+            return priceHistory.get().cex() === cex
+        }) as PriceHistory | null
+    }
+    
     findLastPrice = (): PriceHistory | null => {
         return this.first() as PriceHistory || null
     }
 
-    add = (price: number) => {
+    add = (price: number, cex: TCEX) => {
         const ph: IPriceHistory ={
             price,
-            time: Math.floor(Date.now() / 1000)
+            time: Math.floor(Date.now() / 1000),
+            cex
         }
         
         return this.prepend([ph])

@@ -64,19 +64,14 @@ class Controller {
         const list = this.pairList.filterByPriceFetchRequired(fetchInterval)
             list.slice(0, 10).forEach((p: Pair) => {
                 const key = p.get().id()
-                const purged = this.pairList.purgePairIfUnfound(p)
-
+                const purged = this.pairList.purgePairIfUnfound(p, this._log)
                 if (!purged)
                     p.fetchLastPriceIfNeeded(fetchInterval, this._log)
                 else {
-                    //clear the price history of the pair
-                    this._log(`Pair ${p.get().id()} removed`)
-
                     //remove the price history from the map
                     delete this.priceHistoryMap[key] 
                     //remove the price history from the local storage
                     manager.localStoreManager().removeKey(key)
-
                     this._log(`Price history of ${p.get().id()} removed`)
 
                     const symbols = key.split('-')
@@ -97,15 +92,18 @@ export const controller = new Controller()
 
 export interface PolyPriceOptions {
     local_storage?: any
-    ms_request_pair_price_interval?: number
+    //default: 10 minutes
+    interval_pair_price_request_ms?: number
+    //cexes to ignore
     ignore_cexes?: TCEX[]
-    ms_remove_pair_price_history_interval?: number
+    //default: 0 (never)
+    max_age_price_history_before_purge_ms?: number
     logging?: boolean
 }
 
 const DEFAULT_OPTIONS: PolyPriceOptions = {
-    ms_request_pair_price_interval: 10 * 60 * 1000, // 10 minutes
-    ms_remove_pair_price_history_interval: 0, // never
+    interval_pair_price_request_ms: 10 * 60 * 1000, // 10 minutes
+    max_age_price_history_before_purge_ms: 0,
     ignore_cexes: [],
     logging: false
 }
@@ -124,8 +122,8 @@ export class PolyPrice {
 
     options = () => {
         return {
-            priceFetchInterval: () => Math.min(this._options.ms_request_pair_price_interval || 0, 60 * 1000), // 1 minute minimum
-            removePriceHistoryInterval: () => Math.min(this._options.ms_remove_pair_price_history_interval || 0, 0), // 0 means never
+            priceFetchInterval: () => Math.min(this._options.interval_pair_price_request_ms || 0, 60 * 1000), // 1 minute minimum
+            removePriceHistoryInterval: () => Math.min(this._options.max_age_price_history_before_purge_ms || 0, 0), // 0 means never
             logginEnabled: () => !!this._options.logging,
             disactivedCEXes: () => this._options.ignore_cexes || [],
         }
@@ -143,6 +141,8 @@ export class PolyPrice {
         failRequestHistory.setState([]).store()
         this._log('Fail history erased')
     }
+
+    addPair = controller.addPair
 
     private _runIntervals = () => {
         
