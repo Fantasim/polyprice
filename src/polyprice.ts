@@ -1,9 +1,99 @@
 import {config, manager }from 'acey'
-import { CEXList, TCEX, newCexList } from './models/cex'
+import { CEX, CEXList, TCEX, newCexList } from './models/cex'
 import { Pair, PairList } from './models/pair'
 import { PriceHistoryList } from './models/price-history'
 import { CEX_LIST } from './constant'
 import { failRequestHistory } from './models/fail-history'
+
+class Controller {
+
+    private _log = (...msg: any) => {
+        if (this._logging)
+            console.log(...msg)
+    }
+
+    private _logging = false
+    public cexList: CEXList
+    public pairList: PairList = new PairList([], {key: 'pairs', connected: true})
+    public priceHistoryMap: {[key: string]: PriceHistoryList} = {}
+
+    constructor(){
+        this.cexList = newCexList(CEX_LIST)
+
+        this.pairList.watch().localStoreFetch(() => {
+            this.pairList.forEach((pair) => {
+                const history = new PriceHistoryList([], {key: pair.get().id(), connected: true})
+                manager.connectModel(history)
+                this.priceHistoryMap[pair.get().id()] = history
+            })
+            // this._log('Price history loaded from local storage')
+        })
+    }
+
+    setCEXList = (ignore_cexes: TCEX[]) => {
+        const filteredList = CEX_LIST.filter((cex) => !ignore_cexes.includes(cex))
+        this.cexList.deleteBy((cex: CEX) => !filteredList.includes(cex.get().name()))
+    }
+
+     purgePriceHistories = (rmPairPriceHistoryInterval: number) => {
+        if (rmPairPriceHistoryInterval > 0){
+            for (const key in this.priceHistoryMap){
+                this.priceHistoryMap[key].removePriceBeforeTime(Date.now() - rmPairPriceHistoryInterval)
+            }
+        }
+        this._log('old price history purged')
+    }
+
+    addPair = (symbol0: string, symbol1: string) => {
+        const { pairList, priceHistoryMap } = this
+
+        const err = pairList.add(symbol0, symbol1)
+        if (typeof err === 'string')
+            return err
+        err.store()
+        const pair = pairList.last() as Pair
+
+        const history = new PriceHistoryList([], {key: pair.get().id(), connected: true})
+        manager.connectModel(history)
+        priceHistoryMap[pair.get().id()] = history
+        return pair
+    }
+
+    refreshOrClearPair = (fetchInterval: number) => {
+
+        const list = this.pairList.filterByPriceFetchRequired(fetchInterval)
+            list.slice(0, 10).forEach((p: Pair) => {
+                const key = p.get().id()
+                const purged = this.pairList.purgePairIfUnfound(p)
+
+                if (!purged)
+                    p.fetchLastPriceIfNeeded(fetchInterval, this._log)
+                else {
+                    //clear the price history of the pair
+                    this._log(`Pair ${p.get().id()} removed`)
+
+                    //remove the price history from the map
+                    delete this.priceHistoryMap[key] 
+                    //remove the price history from the local storage
+                    manager.localStoreManager().removeKey(key)
+
+                    this._log(`Price history of ${p.get().id()} removed`)
+
+                    const symbols = key.split('-')
+
+                    //if a pair failed, we try to add it again reversed
+                    this.addPair(symbols[1], symbols[0])
+                }
+            })
+    }
+
+    setLogging = (logging: boolean) => {
+        this._logging = logging
+    }
+
+}
+
+export const controller = new Controller()
 
 export interface PolyPriceOptions {
     local_storage?: any
@@ -24,44 +114,29 @@ export class PolyPrice {
 
     private _running = false
     private _options: PolyPriceOptions
-    private _cexList: CEXList
-    private _pairList: PairList = new PairList([], {key: 'pairs', connected: true})
-    private _priceHistoryMap: {[key: string]: PriceHistoryList} = {}
     private _intervalPairPriceFetch: any
     private _intervalPairPriceHistoryRemove: any
 
     private _log = (...msg: any) => {
-        if (this._options.logging)
+        if (this.options().logginEnabled())
             console.log(...msg)
+    }
+
+    options = () => {
+        return {
+            priceFetchInterval: () => Math.min(this._options.ms_request_pair_price_interval || 0, 60 * 1000), // 1 minute minimum
+            removePriceHistoryInterval: () => Math.min(this._options.ms_remove_pair_price_history_interval || 0, 0), // 0 means never
+            logginEnabled: () => !!this._options.logging,
+            disactivedCEXes: () => this._options.ignore_cexes || [],
+        }
     }
 
     constructor(options: PolyPriceOptions){
         options.local_storage && config.setStoreEngine(options.local_storage)
         this._options = Object.assign({}, DEFAULT_OPTIONS, options)
-        this._options.ms_request_pair_price_interval = Math.min(this._options.ms_request_pair_price_interval || 0, 60 * 1000) // 1 minute
-
-        const filteredList = CEX_LIST.filter((cex) => !this._options.ignore_cexes || !this._options.ignore_cexes.includes(cex))
-        this._cexList = newCexList(filteredList)
-        this._log('Active cexes: ' + filteredList.join(', '))
-
-        this._pairList.watch().localStoreFetch(() => {
-            this._pairList.forEach((pair) => {
-                const history = new PriceHistoryList([], {key: pair.get().id(), connected: true})
-                manager.connectModel(history)
-                this._priceHistoryMap[pair.get().id()] = history
-            })
-            this._log('Price history loaded from local storage')
-        })
-    }
-
-    private _purgePriceHistories = () => {
-        const rmInterval = this._options.ms_remove_pair_price_history_interval || 0
-        if (rmInterval > 0){
-            for (const key in this._priceHistoryMap){
-                this._priceHistoryMap[key].removePriceBeforeTime(Date.now() - rmInterval)
-            }
-        }
-        this._log('old price history purged')
+        
+        controller.setCEXList(this.options().disactivedCEXes())
+        controller.setLogging(this.options().logginEnabled())
     }
 
     eraseFailHistory = () => {
@@ -69,59 +144,19 @@ export class PolyPrice {
         this._log('Fail history erased')
     }
 
-    addPair = (symbol0: string, symbol1: string) => {
-        const err = this._pairList.add(symbol0, symbol1)
-        if (typeof err === 'string')
-            return err
-        err.store()
-        const pair = this._pairList.last() as Pair
-
-        const history = new PriceHistoryList([], {key: pair.get().id(), connected: true})
-        manager.connectModel(history)
-        this._priceHistoryMap[pair.get().id()] = history
-        return pair
-    }
-
     private _runIntervals = () => {
         
-        const fetchInterval = this._options.ms_request_pair_price_interval as number
-
         this._intervalPairPriceFetch = setInterval(() => {
-            const list = this._pairList.filterByPriceFetchRequired(this._priceHistoryMap, fetchInterval)
-            list.slice(0, 10).forEach((p: Pair) => {
-                const history = this._priceHistoryMap[p.get().id()]
-                const key = p.get().id()
-                const purged = this._pairList.purgePairIfUnfound(p, this._priceHistoryMap[key], this._cexList.count())
-                if (!purged)
-                    p.fetchLastPriceIfNeeded(this._cexList, history, fetchInterval, this._log)
-                else {
-                    //clear the price history of the pair
-                    this._log(`Pair ${p.get().id()} removed`)
-
-                    //remove the price history from the map
-                    delete this._priceHistoryMap[key] 
-                    //remove the price history from the local storage
-                    manager.localStoreManager().removeKey(key)
-
-                    this._log(`Price history of ${p.get().id()} removed`)
-
-                    const symbols = key.split('-')
-
-                    //if a pair failed, we try to add it again reversed
-                    this.addPair(symbols[1], symbols[0])
-                }
-            })
+            controller.refreshOrClearPair(this.options().priceFetchInterval())
         }, 20 * 1000)
 
-        this._log('Pair price fetch interval: ' + fetchInterval / 1000 + ' seconds')
+        this._log('Pair price fetch interval: ' + this.options().priceFetchInterval() / 1000 + ' seconds')
 
-        const rmInterval = this._options.ms_remove_pair_price_history_interval || 0
-
-        if (rmInterval > 0){
-            this._intervalPairPriceHistoryRemove = setInterval(this._purgePriceHistories, 60 * 60 * 1000) // 1 hour
-        }
-
-        this._log('Price history remove interval:', rmInterval > 0 ? rmInterval / 1000 + ' seconds' : 'never')
+        const removeInterval = this.options().removePriceHistoryInterval()
+        if (removeInterval)
+            this._intervalPairPriceHistoryRemove = setInterval(() => controller.purgePriceHistories(removeInterval), 60 * 60 * 1000) // 1 hour
+        
+        this._log('Price history remove interval:', removeInterval > 0 ? removeInterval / 1000 + ' seconds' : 'never')
     }
 
     private _clearIntervals = () => {
@@ -135,7 +170,7 @@ export class PolyPrice {
             return
         await config.done()
         this._running = true
-        this._purgePriceHistories()
+        controller.purgePriceHistories(this.options().removePriceHistoryInterval())
         this._runIntervals()
         this._log('PolyPrice started')
     }

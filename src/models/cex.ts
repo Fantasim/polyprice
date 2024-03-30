@@ -5,6 +5,7 @@ import { safeParsePrice } from '../utils'
 import { failRequestHistory } from './fail-history'
 import { ENDPOINT_DOES_NOT_EXIST_ERROR_CODE, RETRY_LOOKING_FOR_PAIR_INTERVAL, UNABLE_TO_PARSE_PRICE_ERROR_CODE, UNABLE_TO_REACH_SERVER_ERROR_CODE, UNFOUND_PAIR_ERROR_CODE } from '../constant'
 import fetch from "node-fetch-native";
+import { controller } from '../polyprice'
 
 export type TCEX  = 'binance' | 'coinbase' | 'kraken' | /* 'bitfinex' | 'bitstamp' | */ 'gemini' | 'kucoin'
 
@@ -16,7 +17,7 @@ const DEFAULT_STATE: ICEX_State = {
     name: 'binance'
 }
 
-class CEX extends Model {
+export class CEX extends Model {
 
     private _requestCount = 0
     private _disabledUntil = 0
@@ -54,19 +55,18 @@ class CEX extends Model {
         }
     }
 
-    fetchPrice = async (pair: Pair, priceHistoryList: PriceHistoryList, log?: (o: any) => void) => {
+    fetchPrice = async (pair: Pair, log?: (o: any) => void) => {
         const endpointURL = this.get().endpoint(pair)
-        const controller = new AbortController();
-        const signal = controller.signal;
+        const abortController = new AbortController();
         
         const timeoutMs = 5000; // Timeout duration in milliseconds
-        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+        const timeoutId = setTimeout(() => abortController.abort(), timeoutMs);
 
         try {
             this._requestCount++
             log && log(`Fetching price from ${this.get().name()} for ${pair.get().id()}`)
 
-            const response = await fetch(endpointURL, {signal})
+            const response = await fetch(endpointURL, {signal: abortController.signal})
             log && log(`Response status from ${this.get().name()} for ${pair.get().id()}: ${response.status}`)
             if (response.status === 200){
                 const json = await response.json() as any
@@ -112,6 +112,7 @@ class CEX extends Model {
                 const priceOrError = safeParsePrice(unparsedPrice)
                 if (typeof priceOrError === 'number' && code === 200){
                     log && log(`New price from ${this.get().name()} for ${pair.get().id()}: ${priceOrError}`)
+                    const priceHistoryList = controller.priceHistoryMap[pair.get().id()] 
                     return priceHistoryList.add(priceOrError as number).store()                    
                 }
                 else if (code !== 200)

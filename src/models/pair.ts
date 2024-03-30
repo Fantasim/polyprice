@@ -4,6 +4,7 @@ import { failRequestHistory } from './fail-history';
 import { CEXList } from './cex';
 import { RETRY_LOOKING_FOR_PAIR_INTERVAL, UNFOUND_PAIR_ERROR_CODE } from '../constant';
 import { buildKey } from '../utils';
+import { controller } from '../polyprice';
 
 interface IPairState {
     symbol0: string
@@ -18,15 +19,18 @@ export class Pair extends Model {
     }
     
 
-    needToBeFetched = (history: PriceHistoryList, interval: number) => {
+    needToBeFetched = (interval: number) => {
+        const history = controller.priceHistoryMap[this.get().id()]
+
         const lastPrice = history.findLastPrice()
         return !lastPrice || lastPrice.wasItMoreThanTimeAgo(interval)
     }   
 
-    fetchLastPriceIfNeeded = (cexes: CEXList, history: PriceHistoryList, interval: number, log?: ((o: any) => void)) =>{
-        if (this.needToBeFetched(history, interval)){
-            const cex = cexes.pickCEXForPair(this)
-            return cex ? cex.fetchPrice(this, history, log) : null
+    fetchLastPriceIfNeeded = (interval: number, log?: ((o: any) => void)) => {
+        const { cexList } = controller
+        if (this.needToBeFetched(interval)){
+            const cex = cexList.pickCEXForPair(this)
+            return cex ? cex.fetchPrice(this, log) : null
         }
         return null
     }
@@ -47,11 +51,8 @@ export class PairList extends Collection {
         super(state, [Pair, PairList], options)
     }
 
-    filterByPriceFetchRequired = (priceHistoryMap: {[key: string]: PriceHistoryList}, interval: number) => {
-        return this.filter((pair: Pair) => {
-            const history = priceHistoryMap[pair.get().id()]
-            return pair.needToBeFetched(history, interval)
-        }) as PairList
+    filterByPriceFetchRequired = (interval: number) => {
+        return this.filter((pair: Pair) => pair.needToBeFetched(interval)) as PairList
     }
 
     deleteByID = (id: string) => {
@@ -60,7 +61,11 @@ export class PairList extends Collection {
         })
     }
 
-    purgePairIfUnfound = (pair: Pair, priceHistory: PriceHistoryList, activeCEXCount: number) => {
+    purgePairIfUnfound = (pair: Pair) => {
+        const { priceHistoryMap, cexList } = controller
+        const activeCEXCount = cexList.count()
+        const priceHistory = priceHistoryMap[pair.get().id()]
+            
         const sixHoursAgo = Date.now() - 6 * 60 * 60 * 1000 // 6 hours
         const price = priceHistory.filterAfterTime(Date.now() - sixHoursAgo)
         if (price.count() === 0){
