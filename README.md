@@ -40,11 +40,13 @@ const poly = new PolyPrice({
     interval_pair_price_request_ms: 60 * 1000 // 1 minute
 })
 
-//start the background process that refreshes the added pair in the background.
+//start the background process that refreshes the added pairs in the background.
 poly.run()
 
 //adding a pair
 poly.addPair('BTC', 'USDT')
+poly.addPair('ETH', 'USDT')
+poly.addPair('LTC', 'USDT')
 
 //remove a pair
 poly.removePair('BTC', 'USDT')
