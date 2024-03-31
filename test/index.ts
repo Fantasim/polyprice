@@ -12,10 +12,9 @@ import { runExchangeTests } from './exchange'
 
 const DB_PATH = './.db'
 
-const log = (...o: any) => console.log(...o)
 const poly = new PolyPrice({
     local_storage: new LocalStorage(DB_PATH),  
-    logging: true,
+    logging: 'new-price-only',
     interval_pair_price_request_ms: 3600 * 1000 // 1 hour
 })
 

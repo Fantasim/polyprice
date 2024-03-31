@@ -7,12 +7,7 @@ import { failRequestHistory } from './models/fail-history'
 
 class Controller {
 
-    private _log = (...msg: any) => {
-        if (this._logging)
-            console.log(...msg)
-    }
-
-    private _logging = false
+    private _logging: 'none' | 'new-price-only' | 'all' = 'none'
     public cexList: CEXList
     public pairList: PairList = new PairList([], {key: 'pairs', connected: true})
     public priceHistoryMap: {[key: string]: PriceHistoryList} = {}
@@ -26,8 +21,35 @@ class Controller {
                 manager.connectModel(history)
                 this.priceHistoryMap[pair.get().id()] = history
             })
-            // this._log('Price history loaded from local storage')
+            this.printRegularLog('Price history loaded from local storage')
         })
+    }
+
+    printRegularLog = (...msg: any) => {
+        if (this._logging === 'all')
+            console.log(...msg)
+    }
+
+    printPriceLog = (symbol0: string, symbol1: string, price: number) => {
+        if (this._logging === 'new-price-only' || this._logging === 'all'){
+            const colorMap: { [key: string]: string } = {}; // Map to store color for each symbol
+            const symbols = [symbol0, symbol1];
+    
+            // Assign unique colors to each symbol based on its name
+            symbols.forEach((symbol, index) => {
+                const colors = ['31', '32', '33', '34', '35', '36']; // ANSI color codes for red, green, yellow, blue, magenta, cyan
+                colorMap[symbol] = colors[index % colors.length];
+            });
+    
+            // Get current time
+            const currentTime = `\x1b[90m${new Date().toLocaleTimeString()}\x1b[0m`; // Grey color for time stamp
+    
+            // Construct the log message with color formatting for symbols
+            const logMessage = `[\x1b[90mpolyprice\x1b[0m - ${currentTime}] 1 \x1b[38;5;${colorMap[symbol0]}m${symbol0} \x1b[0m= \x1b[1m${price.toFixed(2)} \x1b[38;5;${colorMap[symbol1]}m${symbol1}\x1b[0m`;
+    
+            // Print the log message
+            console.log(logMessage);
+        }
     }
 
     setCEXList = (ignore_cexes: TCEX[]) => {
@@ -41,7 +63,7 @@ class Controller {
                 this.priceHistoryMap[key].removePriceBeforeTime(Date.now() - rmPairPriceHistoryInterval)
             }
         }
-        this._log('old price history purged')
+        this.printRegularLog('old price history purged')
     }
 
     addPair = (symbol0: string, symbol1: string) => {
@@ -77,13 +99,13 @@ class Controller {
             const key = pair.get().id()
             
             this.pairList.delete(pair).store()
-            this._log(`Pair ${key} removed`)
+            this.printRegularLog(`Pair ${key} removed`)
 
             delete this.priceHistoryMap[key]
             //remove the price history from the local storage
             manager.localStoreManager().removeKey(key)
 
-            this._log(`Price history of ${pair.get().id()} removed`)
+            this.printRegularLog(`Price history of ${pair.get().id()} removed`)
 
             if (tryAgainWithPairReversed){
                 const symbols = key.split('-')
@@ -102,11 +124,11 @@ class Controller {
         const list = this.pairList.filterByPriceFetchRequired(fetchInterval)
         for (let i = 0; i < Math.min(list.count(), MAXIMUM_FETCH_PER_BATCH); i++){
             const pair = list.nodeAt(i) as Pair
-            await pair.fetchLastPriceIfNeeded(fetchInterval, this._log)
+            await pair.fetchLastPriceIfNeeded(fetchInterval)
         }
     }
 
-    setLogging = (logging: boolean) => {
+    setLogging = (logging: 'none' | 'new-price-only' | 'all') => {
         this._logging = logging
     }
 
@@ -122,14 +144,15 @@ export interface PolyPriceOptions {
     ignore_cexes?: TCEX[]
     //default: 0 (never)
     max_age_price_history_before_purge_ms?: number
-    logging?: boolean
+    logging: 'none' | 'new-price-only' | 'all'
 }
 
 const DEFAULT_OPTIONS: PolyPriceOptions = {
     interval_pair_price_request_ms: 10 * 60 * 1000, // 10 minutes
     max_age_price_history_before_purge_ms: 0,
     ignore_cexes: [],
-    logging: false
+    logging: 'new-price-only',
+    local_storage: undefined
 }
 
 export class PolyPrice {
@@ -140,7 +163,7 @@ export class PolyPrice {
     private _intervalPairPriceHistoryRemove: any
 
     private _log = (...msg: any) => {
-        if (this.options().logginEnabled())
+        if (this.options().fullLogginEnabled())
             console.log(...msg)
     }
 
@@ -148,7 +171,7 @@ export class PolyPrice {
         return {
             priceFetchInterval: () => Math.max(this._options.interval_pair_price_request_ms || 0, 60 * 1000), // 1 minute minimum
             removePriceHistoryInterval: () => Math.max(this._options.max_age_price_history_before_purge_ms || 0, 0), // 0 means never
-            logginEnabled: () => !!this._options.logging,
+            fullLogginEnabled: () => this._options.logging === 'all',
             disactivedCEXes: () => this._options.ignore_cexes || [],
         }
     }
@@ -158,7 +181,7 @@ export class PolyPrice {
         this._options = Object.assign({}, DEFAULT_OPTIONS, options)
         
         controller.setCEXList(this.options().disactivedCEXes())
-        controller.setLogging(this.options().logginEnabled())
+        controller.setLogging(this._options.logging)
     }
 
     clearFailHistory = () => {

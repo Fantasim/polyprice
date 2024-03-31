@@ -50,11 +50,11 @@ export class Pair extends Model {
     }   
 
     //Fetches the last price from the CEX that has the pair
-    fetchLastPriceIfNeeded = (interval: number, log?: ((o: any) => void)) => {
+    fetchLastPriceIfNeeded = (interval: number) => {
         const { cexList } = controller
         if (this.needToBeFetched(interval)){
             const cex = cexList.pickCEXForPair(this)
-            return cex ? cex.fetchLastPrice(this, log) : null
+            return cex ? cex.fetchLastPrice(this) : null
         }
         return null
     }

@@ -42,9 +42,9 @@ export class CEX extends Model {
         }
     }
 
-    fetchLastPrice = async (pair: Pair, log?: (o: any) => void) => {
+    fetchLastPrice = async (pair: Pair) => {
         this._requestCount++
-        const r = await fetchPrice(this, pair, log)
+        const r = await fetchPrice(this, pair)
         if (typeof r === 'number' && r === ENDPOINT_DOES_NOT_EXIST_ERROR_CODE) {
             this.setDisabledUntil(Date.now() * 2) //forever
         }

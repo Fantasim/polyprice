@@ -26,10 +26,7 @@ const generalExpectationsPriceFetchAfterFailure = (pair: Pair, cex: TCEX, r: num
     expect(failRequestHistory.count()).to.eq(failListCount)
 }
 
-const log = (...o: any) => console.log(...o)
-
 export const runExchangeTests = (poly: PolyPrice) => {
-
 
     describe('Coinbase', () => {
         let COUNT = 1
@@ -43,7 +40,7 @@ export const runExchangeTests = (poly: PolyPrice) => {
             const pair = poly.addPair('BTC', 'USDT') as Pair
             expect(pair).to.be.instanceOf(Pair)
 
-            const r = await exchange.fetchLastPrice(pair, log)
+            const r = await exchange.fetchLastPrice(pair)
             expect(r).to.not.be.instanceOf(Number)
             generalExpectationsPriceFetchAfterSuccess(pair, NAME, r as any, COUNT)
         })
@@ -53,7 +50,7 @@ export const runExchangeTests = (poly: PolyPrice) => {
             const pair = poly.addPair('YYY', 'WWW') as Pair
             expect(pair).to.be.instanceOf(Pair)
 
-            const r = await exchange.fetchLastPrice(pair, log)
+            const r = await exchange.fetchLastPrice(pair)
             generalExpectationsPriceFetchAfterFailure(pair, NAME, r as any, UNFOUND_PAIR_ERROR_CODE, COUNT * 2 - 1)
         })
 
@@ -62,7 +59,7 @@ export const runExchangeTests = (poly: PolyPrice) => {
             expect(pair).to.be.instanceOf(Pair)
 
             CEX_PRICE_ENDPOINTS[NAME] = (symbol0, symbol1) => `https://api.pro.coinbase.com/or/what/blabla/${symbol0}-${symbol1}`
-            const r = await exchange.fetchLastPrice(pair, log)
+            const r = await exchange.fetchLastPrice(pair)
             failRequestHistory.action().store()
             generalExpectationsPriceFetchAfterFailure(pair, NAME, r as any, ENDPOINT_DOES_NOT_EXIST_ERROR_CODE, COUNT * 2)
             expect(exchange.isDisabled()).to.eq(true)
@@ -83,7 +80,7 @@ export const runExchangeTests = (poly: PolyPrice) => {
             const pair = poly.addPair('BTC', 'USDT') as Pair
             expect(pair).to.be.instanceOf(Pair)
 
-            const r = await exchange.fetchLastPrice(pair, log)
+            const r = await exchange.fetchLastPrice(pair)
             expect(r).to.not.be.instanceOf(Number)
             generalExpectationsPriceFetchAfterSuccess(pair, NAME, r as any, COUNT)
         })
@@ -93,7 +90,7 @@ export const runExchangeTests = (poly: PolyPrice) => {
             const pair = poly.addPair('YYY', 'WWW') as Pair
             expect(pair).to.be.instanceOf(Pair)
 
-            const r = await exchange.fetchLastPrice(pair, log)
+            const r = await exchange.fetchLastPrice(pair)
             generalExpectationsPriceFetchAfterFailure(pair, NAME, r as any, UNFOUND_PAIR_ERROR_CODE, COUNT * 2 - 1)
         })
 
@@ -102,7 +99,7 @@ export const runExchangeTests = (poly: PolyPrice) => {
             expect(pair).to.be.instanceOf(Pair)
 
             CEX_PRICE_ENDPOINTS[NAME] = (symbol0, symbol1) => `https://api.binance.com/or/what/blabla/${symbol0}-${symbol1}`
-            const r = await exchange.fetchLastPrice(pair, log)
+            const r = await exchange.fetchLastPrice(pair)
             failRequestHistory.action().store()
             generalExpectationsPriceFetchAfterFailure(pair, NAME, r as any, ENDPOINT_DOES_NOT_EXIST_ERROR_CODE, COUNT * 2)
             expect(exchange.isDisabled()).to.eq(true)
@@ -122,7 +119,7 @@ export const runExchangeTests = (poly: PolyPrice) => {
             const pair = poly.addPair('BTC', 'USDT') as Pair
             expect(pair).to.be.instanceOf(Pair)
 
-            const r = await exchange.fetchLastPrice(pair, log)
+            const r = await exchange.fetchLastPrice(pair)
             expect(r).to.not.be.instanceOf(Number)
             generalExpectationsPriceFetchAfterSuccess(pair, NAME, r as any, COUNT)
         })
@@ -132,7 +129,7 @@ export const runExchangeTests = (poly: PolyPrice) => {
             const pair = poly.addPair('YYY', 'WWW') as Pair
             expect(pair).to.be.instanceOf(Pair)
 
-            const r = await exchange.fetchLastPrice(pair, log)
+            const r = await exchange.fetchLastPrice(pair)
             generalExpectationsPriceFetchAfterFailure(pair, NAME, r as any, UNFOUND_PAIR_ERROR_CODE, COUNT * 2 - 1)
         })
 
@@ -141,7 +138,7 @@ export const runExchangeTests = (poly: PolyPrice) => {
             expect(pair).to.be.instanceOf(Pair)
 
             CEX_PRICE_ENDPOINTS[NAME] = (symbol0, symbol1) => `https://api.kraken.com/or/what/blabla/${symbol0}-${symbol1}`
-            const r = await exchange.fetchLastPrice(pair, log)
+            const r = await exchange.fetchLastPrice(pair)
             failRequestHistory.action().store()
             generalExpectationsPriceFetchAfterFailure(pair, NAME, r as any, ENDPOINT_DOES_NOT_EXIST_ERROR_CODE, COUNT * 2)
             expect(exchange.isDisabled()).to.eq(true)
@@ -161,7 +158,7 @@ export const runExchangeTests = (poly: PolyPrice) => {
             const pair = poly.addPair('BTC', 'USDT') as Pair
             expect(pair).to.be.instanceOf(Pair)
 
-            const r = await exchange.fetchLastPrice(pair, log)
+            const r = await exchange.fetchLastPrice(pair)
             expect(r).to.not.be.instanceOf(Number)
             generalExpectationsPriceFetchAfterSuccess(pair, NAME, r as any, COUNT)
         })
@@ -171,7 +168,7 @@ export const runExchangeTests = (poly: PolyPrice) => {
             const pair = poly.addPair('YYY', 'WWW') as Pair
             expect(pair).to.be.instanceOf(Pair)
 
-            const r = await exchange.fetchLastPrice(pair, log)
+            const r = await exchange.fetchLastPrice(pair)
             generalExpectationsPriceFetchAfterFailure(pair, NAME, r as any, UNFOUND_PAIR_ERROR_CODE, COUNT * 2 - 1)
         })
 
@@ -180,7 +177,7 @@ export const runExchangeTests = (poly: PolyPrice) => {
             expect(pair).to.be.instanceOf(Pair)
 
             CEX_PRICE_ENDPOINTS[NAME] = (symbol0, symbol1) => `https://api.gemini.com/or/what/blabla/${symbol0}-${symbol1}`
-            const r = await exchange.fetchLastPrice(pair, log)
+            const r = await exchange.fetchLastPrice(pair)
             failRequestHistory.action().store()
             generalExpectationsPriceFetchAfterFailure(pair, NAME, r as any, ENDPOINT_DOES_NOT_EXIST_ERROR_CODE, COUNT * 2)
             expect(exchange.isDisabled()).to.eq(true)
@@ -200,7 +197,7 @@ export const runExchangeTests = (poly: PolyPrice) => {
             const pair = poly.addPair('BTC', 'USDT') as Pair
             expect(pair).to.be.instanceOf(Pair)
 
-            const r = await exchange.fetchLastPrice(pair, log)
+            const r = await exchange.fetchLastPrice(pair)
             expect(r).to.not.be.instanceOf(Number)
             generalExpectationsPriceFetchAfterSuccess(pair, NAME, r as any, COUNT)
         })
@@ -210,7 +207,7 @@ export const runExchangeTests = (poly: PolyPrice) => {
             const pair = poly.addPair('YYY', 'WWW') as Pair
             expect(pair).to.be.instanceOf(Pair)
 
-            const r = await exchange.fetchLastPrice(pair, log)
+            const r = await exchange.fetchLastPrice(pair)
             generalExpectationsPriceFetchAfterFailure(pair, NAME, r as any, UNFOUND_PAIR_ERROR_CODE, COUNT * 2 - 1)
         })
 
@@ -219,7 +216,7 @@ export const runExchangeTests = (poly: PolyPrice) => {
             expect(pair).to.be.instanceOf(Pair)
 
             CEX_PRICE_ENDPOINTS[NAME] = (symbol0, symbol1) => `https://api.kucoin.com/or/what/blabla/${symbol0}-${symbol1}`
-            const r = await exchange.fetchLastPrice(pair, log)
+            const r = await exchange.fetchLastPrice(pair)
             failRequestHistory.action().store()
             generalExpectationsPriceFetchAfterFailure(pair, NAME, r as any, ENDPOINT_DOES_NOT_EXIST_ERROR_CODE, COUNT * 2)
             expect(exchange.isDisabled()).to.eq(true)

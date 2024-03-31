@@ -2,9 +2,10 @@ import { ENDPOINT_DOES_NOT_EXIST_ERROR_CODE, MAX_REQUESTS_REACHED_ERROR_CODE, UN
 import { CEX } from "./models/cex";
 import { failRequestHistory } from "./models/fail-history";
 import { Pair } from "./models/pair";
+import { controller } from "./polyprice";
 import { fetchWithTimeout, safeParsePrice } from "./utils";
 
-export const fetchPrice = async (cex: CEX,  pair: Pair, log?: (o: any) => void) => {
+export const fetchPrice = async (cex: CEX,  pair: Pair) => {
     const endpointURL = cex.get().endpoint(pair);
     const abortController = new AbortController();
     
@@ -12,29 +13,28 @@ export const fetchPrice = async (cex: CEX,  pair: Pair, log?: (o: any) => void) 
     const timeoutId = setTimeout(() => abortController.abort(), timeoutMs);
 
     try {
-        // this._requestCount++;
-        log && log(`Fetching price from ${cex.get().name()} for ${pair.get().id()}`);
+        controller.printRegularLog(`Fetching price from ${cex.get().name()} for ${pair.get().id()}`);
 
-        const response = await fetchWithTimeout(endpointURL, abortController.signal, log);
-        const result = await handleResponse(cex, response as any, pair, log);
+        const response = await fetchWithTimeout(endpointURL, abortController.signal);
+        const result = await handleResponse(cex, response as any, pair);
 
         clearTimeout(timeoutId);
         return result;
     } catch (error) {
         clearTimeout(timeoutId);
-        return handleError(cex, error, pair, log);
+        return handleError(cex, error, pair);
     }
 }
 
-const handleResponse = async (cex: CEX, response: Response, pair: Pair, log?: (o: any) => void) => {
+const handleResponse = async (cex: CEX, response: Response, pair: Pair) => {
     if (response.status === 200) {
-        return await parseResponse(cex, response, pair, log);
+        return await parseResponse(cex, response, pair);
     } else {
-        return await handleNon200Response(cex, response, pair, log);
+        return await handleNon200Response(cex, response, pair);
     }
 }
 
-const parseResponse = async (cex: CEX, response: Response, pair: Pair, log?: (o: any) => void) => {
+const parseResponse = async (cex: CEX, response: Response, pair: Pair) => {
     const json = await response.json() as any;
     let unparsedPrice;
     let code: number = 200;
@@ -65,52 +65,53 @@ const parseResponse = async (cex: CEX, response: Response, pair: Pair, log?: (o:
 
     const priceOrError = safeParsePrice(unparsedPrice);
     if (typeof priceOrError === 'number' && code === 200) {
-        log && log(`New price from ${cex.get().name()} for ${pair.get().id()}: ${priceOrError}`);
+        controller.printPriceLog(pair.get().symbol0(), pair.get().symbol1(), priceOrError);
+       
         const historyList = pair.get().priceHistoryList()
         //if there is no price history instance, it means the pair has been removed
         historyList && historyList.add(priceOrError, cex.get().name()).store();
         return {cex: cex.get().name(), price: priceOrError}
     } else {
-        failRequestHistory.add(pair, cex.get().name(), code === 200 ? UNABLE_TO_PARSE_PRICE_ERROR_CODE : code, log)
+        failRequestHistory.add(pair, cex.get().name(), code === 200 ? UNABLE_TO_PARSE_PRICE_ERROR_CODE : code)
         return code
     }
 }
 
-const handleNon200Response = async (cex: CEX, response: Response, pair: Pair, log?: (o: any) => void) => {
+const handleNon200Response = async (cex: CEX, response: Response, pair: Pair) => {
     switch (response.status) {
         case 429:
             cex.setDisabledUntil(Date.now() + 60 * 1000) // 1 minute
             return MAX_REQUESTS_REACHED_ERROR_CODE
         case 400:
-            failRequestHistory.add(pair, cex.get().name(), UNFOUND_PAIR_ERROR_CODE, log);
+            failRequestHistory.add(pair, cex.get().name(), UNFOUND_PAIR_ERROR_CODE);
             return UNFOUND_PAIR_ERROR_CODE
         case 404:
             if (cex.get().name() === 'coinbase') {
                 const json = await response.json() as any;
                 const keys = Object.keys(json);
                 if (keys[0] === 'message' && json[keys[0]] === 'NotFound') {
-                    failRequestHistory.add(pair, cex.get().name(), UNFOUND_PAIR_ERROR_CODE, log);
+                    failRequestHistory.add(pair, cex.get().name(), UNFOUND_PAIR_ERROR_CODE);
                     return UNFOUND_PAIR_ERROR_CODE
                 } else if (keys[0] === 'message' && json[keys[0]] === 'Unauthorized.' || json[keys[0]] === 'Route not found') {
-                    failRequestHistory.add(pair, cex.get().name(), ENDPOINT_DOES_NOT_EXIST_ERROR_CODE, log);
+                    failRequestHistory.add(pair, cex.get().name(), ENDPOINT_DOES_NOT_EXIST_ERROR_CODE);
                     return ENDPOINT_DOES_NOT_EXIST_ERROR_CODE
                 }
             }
-            failRequestHistory.add(pair, cex.get().name(), ENDPOINT_DOES_NOT_EXIST_ERROR_CODE, log)
+            failRequestHistory.add(pair, cex.get().name(), ENDPOINT_DOES_NOT_EXIST_ERROR_CODE)
             return ENDPOINT_DOES_NOT_EXIST_ERROR_CODE
         case 401:
-            failRequestHistory.add(pair, cex.get().name(), ENDPOINT_DOES_NOT_EXIST_ERROR_CODE, log);
+            failRequestHistory.add(pair, cex.get().name(), ENDPOINT_DOES_NOT_EXIST_ERROR_CODE);
             return ENDPOINT_DOES_NOT_EXIST_ERROR_CODE
     }
     return response.status
 }
 
-const handleError = (cex: CEX, error: any, pair: Pair, log?: (o: any) => void) => {
+const handleError = (cex: CEX, error: any, pair: Pair) => {
     if (error.name === 'AbortError') {
-        failRequestHistory.add(pair, cex.get().name(), UNABLE_TO_REACH_SERVER_ERROR_CODE, log);
+        failRequestHistory.add(pair, cex.get().name(), UNABLE_TO_REACH_SERVER_ERROR_CODE);
         return UNABLE_TO_REACH_SERVER_ERROR_CODE
     } else {
-        log && log(`Fetch error from ${cex.get().name()} for ${pair.get().id()}: ${error.message}`);
+        controller.printRegularLog(`Fetch error from ${cex.get().name()} for ${pair.get().id()}: ${error.message}`);
         return UNABLE_TO_REACH_SERVER_ERROR_CODE
     }
 }
