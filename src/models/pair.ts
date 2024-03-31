@@ -1,5 +1,5 @@
 import  { Collection, IModelOptions, Model } from 'acey';
-import { PriceHistoryList } from './price-history';
+import { IPriceHistory, PriceHistory, PriceHistoryList } from './price-history';
 import { failRequestHistory } from './fail-history';
 import { CEXList, TCEX } from './cex';
 import { RETRY_LOOKING_FOR_PAIR_INTERVAL, UNFOUND_PAIR_ERROR_CODE } from '../constant';
@@ -37,6 +37,14 @@ export class Pair extends Model {
         return false
     }
 
+    lastPrice = (): IPriceHistory | null => {
+        const historyList = this.get().priceHistoryList()
+        if (!historyList)
+            return null
+
+        const p = historyList.findLastPrice()
+        return p ? p.to().plain() as IPriceHistory : null
+    }
 
     //Returns true if the last price is older than the interval
     needToBeFetched = (interval: number) => {

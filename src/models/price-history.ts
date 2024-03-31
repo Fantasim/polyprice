@@ -3,7 +3,7 @@ import { CEX, TCEX } from './cex'
 import { Pair } from './pair'
 import { controller } from '../polyprice'
 
-interface IPriceHistory {
+export interface IPriceHistory {
     price: number
     time: number
     cex: TCEX
