@@ -1,6 +1,5 @@
 
-import typescript from 'rollup-plugin-typescript2'
-import external from 'rollup-plugin-peer-deps-external'
+import typescript from '@rollup/plugin-typescript';
 import { uglify } from 'rollup-plugin-uglify';
 import commonjs from '@rollup/plugin-commonjs';
 import json from '@rollup/plugin-json';
@@ -12,6 +11,7 @@ const config = {
         {
             globals: {
                 'acey': 'acey',
+                'node-fetch-native': 'fetch'
             },
             file: "dist/index.js",
             format: 'umd',
@@ -19,15 +19,14 @@ const config = {
         },
     ],
     plugins: [
-        external(),
         typescript({
             tsconfig: 'tsconfig.json',
-            tsconfigOverride: { compilerOptions: { module: 'ES2020' } },
+            // tsconfigOverride: { compilerOptions: { module: 'ES2020' } },
         }),
         commonjs(),
         uglify(),
         json(),
-    ]
+    ],
 }
 
 pkg.type = 'module';
