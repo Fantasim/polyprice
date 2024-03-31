@@ -66,7 +66,9 @@ const parseResponse = async (cex: CEX, response: Response, pair: Pair, log?: (o:
     const priceOrError = safeParsePrice(unparsedPrice);
     if (typeof priceOrError === 'number' && code === 200) {
         log && log(`New price from ${cex.get().name()} for ${pair.get().id()}: ${priceOrError}`);
-        pair.get().priceHistoryList().add(priceOrError, cex.get().name()).store();
+        const historyList = pair.get().priceHistoryList()
+        //if there is no price history instance, it means the pair has been removed
+        historyList && historyList.add(priceOrError, cex.get().name()).store();
         return {cex: cex.get().name(), price: priceOrError}
     } else {
         failRequestHistory.add(pair, cex.get().name(), code === 200 ? UNABLE_TO_PARSE_PRICE_ERROR_CODE : code, log)

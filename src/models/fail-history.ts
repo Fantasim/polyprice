@@ -1,6 +1,8 @@
 import { Collection, IModelOptions, Model } from 'acey'
 import { TCEX } from './cex'
 import { Pair } from './pair'
+import { UNFOUND_PAIR_ERROR_CODE } from '../constant'
+import { controller } from '../polyprice'
 
 interface IFailHistory {
     pair_id: string
@@ -54,8 +56,8 @@ export class FailHistoryList extends Collection {
     }
 
     filterByPairAndCodeAfterTime = (pair: Pair, code: number, after: number) => {
-        return this.filter((priceHistory: FailHistory) => {
-            return priceHistory.get().code() === code && priceHistory.get().pairID().startsWith(pair.get().id()) && priceHistory.get().time().getTime() > after
+        return this.filter((failHistory: FailHistory) => {
+            return failHistory.get().code() === code && failHistory.get().pairID().startsWith(pair.get().id()) && failHistory.get().time().getTime() > after
         }) as FailHistoryList
     }
 
@@ -75,9 +77,17 @@ export class FailHistoryList extends Collection {
             time: Math.floor(Date.now() / 1000),
             code: code
         }
-        
+
         log && log(`Fail history added for ${pair.get().id()} with code ${code}`)
-        return this.prepend([ph])
+        const action = this.prepend([ph])
+
+        //if the pair has not been found anywhere, we remove it
+        if (code === UNFOUND_PAIR_ERROR_CODE && pair.isTrash()){
+            log && log(`Pair ${pair.get().id()} detecte as trash...`)
+            controller.removePair(pair.get().symbol0(), pair.get().symbol1(), true)
+        }
+
+        return action
     }
 }
 

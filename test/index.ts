@@ -8,37 +8,16 @@ import { CEX_LIST, CEX_PRICE_ENDPOINTS, ENDPOINT_DOES_NOT_EXIST_ERROR_CODE, UNFO
 import { PriceHistory, PriceHistoryList } from '../src/models/price-history';
 import { FailHistory, failRequestHistory } from '../src/models/fail-history';
 
+import { runExchangeTests } from './exchange'
+
 const DB_PATH = './.db'
 
 const log = (...o: any) => console.log(...o)
-
 const poly = new PolyPrice({
     local_storage: new LocalStorage(DB_PATH),  
     logging: true,
     interval_pair_price_request_ms: 3600 * 1000 // 1 hour
 })
-
-
-const generalExpectationsPriceFetchAfterSuccess = (pair: Pair, cex: TCEX, r: { cex: TCEX, price: number }, priceListCount: number) => {
-    const { cex: cexName, price } = r as any
-    expect(cex).to.eq(cexName)
-    expect(price).to.be.a('number').above(0)
-    
-    const priceList = pair.get().priceHistoryList() as PriceHistoryList
-    const ph = pair.get().priceHistoryList().first() as PriceHistory
-    expect(ph.get().price()).to.eq(price)
-    expect(ph.get().cex()).to.eq(cex)
-    expect(priceList.count()).to.eq(priceListCount)
-}
-
-const generalExpectationsPriceFetchAfterFailure = (pair: Pair, cex: TCEX, r: number, code: number, failListCount: number) => {
-    expect(r).to.eq(code)
-    const last = failRequestHistory.first() as FailHistory
-    expect(last.get().code()).to.eq(code)
-    expect(last.get().pairID()).to.eq(pair.get().id() + '-' + cex)
-    expect(failRequestHistory.count()).to.eq(failListCount)
-}
-
 
 const main = () => {
 
@@ -52,223 +31,79 @@ const main = () => {
         it('Poly sync DB', async () => {
             await poly.run()
         })
-
-        //  it('Fetch price on BTC/USDT pair (accepted everywhere)', async () => {
-        //     const { cexList } = controller
-
-        //     const pair = poly.addPair('BTC', 'USDT') as Pair
-        //     expect(pair).to.be.instanceOf(Pair)
-
-        //     for (let i = 0; i < cexList.count(); i++){
-        //         const cex = cexList.nodeAt(i) as CEX
-        //         const r = await cex.fetchLastPrice(pair, log)
-        //         expect(r).to.not.be.instanceOf(Number)
-        //         const { cex: cexName, price } = r as any
-        //         expect(cex.get().name()).to.eq(cexName)
-        //         expect(price).to.be.a('number').above(0)
-        //     }
-        //  })
     })
 
+    runExchangeTests(poly)
 
-    describe('Coinbase', () => {
-        let COUNT = 1
+    describe('Smart system', async () => {
+        it('Adding a fetching reversed pair (USDT-ETH)', async () => {
+            const { cexList, pairList } = controller
+            const initilFailHistoryCount = failRequestHistory.count()
 
-        const { cexList } = controller
-        const NAME: TCEX = 'coinbase'
-        const exchange = cexList.findByName(NAME) as CEX
+            const pair = poly.addPair('USDT', 'ETH') as Pair
+            const totalPairs = pairList.count()
 
-        it('BTC-USDT', async () => {
-            //BTC-USDT
-            const pair = poly.addPair('BTC', 'USDT') as Pair
             expect(pair).to.be.instanceOf(Pair)
+            expect(pair.get().id()).to.eq('usdt-eth')
+            expect(pair.get().priceHistoryList().count()).to.eq(0)
 
-            const r = await exchange.fetchLastPrice(pair, log)
-            expect(r).to.not.be.instanceOf(Number)
-            generalExpectationsPriceFetchAfterSuccess(pair, NAME, r as any, COUNT)
+            const CEX_LIST_COUNT = cexList.count()
+            for (let i = 0; i < CEX_LIST_COUNT; i++){
+                const cex = cexList.nodeAt(i) as CEX
+                //we reanabled the cex
+                cex.setDisabledUntil(0)
+                
+                failRequestHistory.add(pair, cex.get().name(), UNFOUND_PAIR_ERROR_CODE)
+
+                const f = failRequestHistory.first() as FailHistory
+                expect(f).to.be.instanceOf(FailHistory)
+                expect(f.get().pairID()).to.eq('usdt-eth-' + cex.get().name())
+                expect(f.get().code()).to.eq(UNFOUND_PAIR_ERROR_CODE)
+                expect(failRequestHistory.count()).to.eq(initilFailHistoryCount + i + 1)
+
+
+                if (i+1 < CEX_LIST_COUNT){
+                    expect(pair.isTrash()).to.be.false
+                    expect(pairList.count()).to.eq(totalPairs)
+                    expect(pairList.findByPair("usdt", "eth")).to.be.instanceOf(Pair)
+                    expect(pairList.findByPair("eth", "usdt")).to.be.undefined
+                } else {
+                    expect(pair.isTrash()).to.be.true
+                    expect(pairList.count()).to.eq(totalPairs)
+                    expect(pairList.findByPair("usdt", "eth")).to.be.undefined
+                    expect(pairList.findByPair("eth", "usdt")).to.be.instanceOf(Pair)
+                }
+            }
         })
 
-        it('XXK-YYQ (non existant)', async () => {
-            //UNEXISTING PAIR
-            const pair = poly.addPair('YYY', 'WWW') as Pair
+        it ('Check CEX picking for pair fetching', () => {
+            const { cexList } = controller
+
+            const pair = poly.addPair('LINK', 'USDT') as Pair
             expect(pair).to.be.instanceOf(Pair)
+            expect(pair.get().id()).to.eq('link-usdt')
+            expect(pair.get().priceHistoryList().count()).to.eq(0)
+            const CEX_LIST_COUNT = cexList.count()
+            
+            const availableCEXes: TCEX[] = []
+            for (let i = 0; i < CEX_LIST_COUNT; i++){
+                const cex = cexList.nodeAt(i) as CEX
+                cex.setDisabledUntil(0)
 
-            const r = await exchange.fetchLastPrice(pair, log)
-            generalExpectationsPriceFetchAfterFailure(pair, NAME, r as any, UNFOUND_PAIR_ERROR_CODE, COUNT * 2 - 1)
-        })
-
-        it('wrong endpoint', async () => {
-            const pair = poly.addPair('BTC', 'USDT') as Pair
-            expect(pair).to.be.instanceOf(Pair)
-
-            CEX_PRICE_ENDPOINTS[NAME] = (symbol0, symbol1) => `https://api.pro.coinbase.com/or/what/blabla/${symbol0}-${symbol1}`
-            const r = await exchange.fetchLastPrice(pair, log)
-            failRequestHistory.action().store()
-            generalExpectationsPriceFetchAfterFailure(pair, NAME, r as any, ENDPOINT_DOES_NOT_EXIST_ERROR_CODE, COUNT * 2)
-            expect(exchange.isDisabled()).to.eq(true)
-            expect(failRequestHistory.uniqueCEXes().length).to.eq(COUNT)
-
-        })
-    })
-
-    describe('Binance', () => {
-        let COUNT = 2
-
-        const { cexList } = controller
-        const NAME: TCEX = 'binance'
-        const exchange = cexList.findByName(NAME) as CEX
-
-        it('BTC-USDT', async () => {
-            //BTC-USDT
-            const pair = poly.addPair('BTC', 'USDT') as Pair
-            expect(pair).to.be.instanceOf(Pair)
-
-            const r = await exchange.fetchLastPrice(pair, log)
-            expect(r).to.not.be.instanceOf(Number)
-            generalExpectationsPriceFetchAfterSuccess(pair, NAME, r as any, COUNT)
-        })
-
-        it('XXK-YYQ (non existant)', async () => {
-            //UNEXISTING PAIR
-            const pair = poly.addPair('YYY', 'WWW') as Pair
-            expect(pair).to.be.instanceOf(Pair)
-
-            const r = await exchange.fetchLastPrice(pair, log)
-            generalExpectationsPriceFetchAfterFailure(pair, NAME, r as any, UNFOUND_PAIR_ERROR_CODE, COUNT * 2 - 1)
-        })
-
-        it('wrong endpoint', async () => {
-            const pair = poly.addPair('BTC', 'USDT') as Pair
-            expect(pair).to.be.instanceOf(Pair)
-
-            CEX_PRICE_ENDPOINTS[NAME] = (symbol0, symbol1) => `https://api.binance.com/or/what/blabla/${symbol0}-${symbol1}`
-            const r = await exchange.fetchLastPrice(pair, log)
-            failRequestHistory.action().store()
-            generalExpectationsPriceFetchAfterFailure(pair, NAME, r as any, ENDPOINT_DOES_NOT_EXIST_ERROR_CODE, COUNT * 2)
-            expect(exchange.isDisabled()).to.eq(true)
-            expect(failRequestHistory.uniqueCEXes().length).to.eq(2)
+                if (i % 2 === 0){
+                    pair.get().priceHistoryList().add(18.55, cex.get().name()).store()
+                    availableCEXes.push(cex.get().name())
+                } else {
+                    failRequestHistory.add(pair, cex.get().name(), UNFOUND_PAIR_ERROR_CODE).store()
+                }
+            }
+            const availableCEXes2 = cexList.filterAvailableCEXForPair(pair)
+            expect(availableCEXes2.count()).to.eq(availableCEXes.length)
+            availableCEXes2.map((cex: CEX) => {
+                expect(availableCEXes).to.include(cex.get().name())
+            })
         })
     })
-
-    describe('Kraken', () => {
-        let COUNT = 3
-
-        const { cexList } = controller
-        const NAME: TCEX = 'kraken'
-        const exchange = cexList.findByName(NAME) as CEX
-
-        it('BTC-USDT', async () => {
-            //BTC-USDT
-            const pair = poly.addPair('BTC', 'USDT') as Pair
-            expect(pair).to.be.instanceOf(Pair)
-
-            const r = await exchange.fetchLastPrice(pair, log)
-            expect(r).to.not.be.instanceOf(Number)
-            generalExpectationsPriceFetchAfterSuccess(pair, NAME, r as any, COUNT)
-        })
-
-        it('XXK-YYQ (non existant)', async () => {
-            //UNEXISTING PAIR
-            const pair = poly.addPair('YYY', 'WWW') as Pair
-            expect(pair).to.be.instanceOf(Pair)
-
-            const r = await exchange.fetchLastPrice(pair, log)
-            generalExpectationsPriceFetchAfterFailure(pair, NAME, r as any, UNFOUND_PAIR_ERROR_CODE, COUNT * 2 - 1)
-        })
-
-        it('wrong endpoint', async () => {
-            const pair = poly.addPair('BTC', 'USDT') as Pair
-            expect(pair).to.be.instanceOf(Pair)
-
-            CEX_PRICE_ENDPOINTS[NAME] = (symbol0, symbol1) => `https://api.kraken.com/or/what/blabla/${symbol0}-${symbol1}`
-            const r = await exchange.fetchLastPrice(pair, log)
-            failRequestHistory.action().store()
-            generalExpectationsPriceFetchAfterFailure(pair, NAME, r as any, ENDPOINT_DOES_NOT_EXIST_ERROR_CODE, COUNT * 2)
-            expect(exchange.isDisabled()).to.eq(true)
-            expect(failRequestHistory.uniqueCEXes().length).to.eq(COUNT)
-        })
-    })
-
-    describe('Gemini', () => {
-        let COUNT = 4
-
-        const { cexList } = controller
-        const NAME: TCEX = 'gemini'
-        const exchange = cexList.findByName(NAME) as CEX
-
-        it('BTC-USDT', async () => {
-            //BTC-USDT
-            const pair = poly.addPair('BTC', 'USDT') as Pair
-            expect(pair).to.be.instanceOf(Pair)
-
-            const r = await exchange.fetchLastPrice(pair, log)
-            expect(r).to.not.be.instanceOf(Number)
-            generalExpectationsPriceFetchAfterSuccess(pair, NAME, r as any, COUNT)
-        })
-
-        it('XXK-YYQ (non existant)', async () => {
-            //UNEXISTING PAIR
-            const pair = poly.addPair('YYY', 'WWW') as Pair
-            expect(pair).to.be.instanceOf(Pair)
-
-            const r = await exchange.fetchLastPrice(pair, log)
-            generalExpectationsPriceFetchAfterFailure(pair, NAME, r as any, UNFOUND_PAIR_ERROR_CODE, COUNT * 2 - 1)
-        })
-
-        it('wrong endpoint', async () => {
-            const pair = poly.addPair('BTC', 'USDT') as Pair
-            expect(pair).to.be.instanceOf(Pair)
-
-            CEX_PRICE_ENDPOINTS[NAME] = (symbol0, symbol1) => `https://api.gemini.com/or/what/blabla/${symbol0}-${symbol1}`
-            const r = await exchange.fetchLastPrice(pair, log)
-            failRequestHistory.action().store()
-            generalExpectationsPriceFetchAfterFailure(pair, NAME, r as any, ENDPOINT_DOES_NOT_EXIST_ERROR_CODE, COUNT * 2)
-            expect(exchange.isDisabled()).to.eq(true)
-            expect(failRequestHistory.uniqueCEXes().length).to.eq(COUNT)
-        })
-    })
-
-    describe('Kucoin', () => {
-        let COUNT = 5
-
-        const { cexList } = controller
-        const NAME: TCEX = 'kucoin'
-        const exchange = cexList.findByName(NAME) as CEX
-
-        it('BTC-USDT', async () => {
-            //BTC-USDT
-            const pair = poly.addPair('BTC', 'USDT') as Pair
-            expect(pair).to.be.instanceOf(Pair)
-
-            const r = await exchange.fetchLastPrice(pair, log)
-            expect(r).to.not.be.instanceOf(Number)
-            generalExpectationsPriceFetchAfterSuccess(pair, NAME, r as any, COUNT)
-        })
-
-        it('XXK-YYQ (non existant)', async () => {
-            //UNEXISTING PAIR
-            const pair = poly.addPair('YYY', 'WWW') as Pair
-            expect(pair).to.be.instanceOf(Pair)
-
-            const r = await exchange.fetchLastPrice(pair, log)
-            generalExpectationsPriceFetchAfterFailure(pair, NAME, r as any, UNFOUND_PAIR_ERROR_CODE, COUNT * 2 - 1)
-        })
-
-        it('wrong endpoint', async () => {
-            const pair = poly.addPair('BTC', 'USDT') as Pair
-            expect(pair).to.be.instanceOf(Pair)
-
-            CEX_PRICE_ENDPOINTS[NAME] = (symbol0, symbol1) => `https://api.kucoin.com/or/what/blabla/${symbol0}-${symbol1}`
-            const r = await exchange.fetchLastPrice(pair, log)
-            failRequestHistory.action().store()
-            generalExpectationsPriceFetchAfterFailure(pair, NAME, r as any, ENDPOINT_DOES_NOT_EXIST_ERROR_CODE, COUNT * 2)
-            expect(exchange.isDisabled()).to.eq(true)
-            expect(failRequestHistory.uniqueCEXes().length).to.eq(COUNT)
-        })
-    })
-
-
-
 
 }
 

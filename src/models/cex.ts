@@ -24,10 +24,11 @@ export class CEX extends Model {
     }
 
     isDisabled = () => Date.now() < this._disabledUntil
+
     setDisabledUntil = (time: number) => {
         if (time > Date.now() + 365 * 24 * 60 * 60 * 1000) {
             setInterval(() => {
-                console.warn(`%c endpoint ${this.get().name()} has probably changed, fix the issue or ignore it for now in the PolyPrice options`, 'color: yellow; font-weight: bold');
+                console.warn('\x1b[33m%s\x1b[0m', `endpoint ${this.get().name()} has probably changed, fix the issue or ignore it for now in the PolyPrice options`);
             }, 60 * 1000)
         }
         this._disabledUntil = time
@@ -63,10 +64,13 @@ export class CEXList extends Collection {
 
     filterByEnabled = () => this.filter((cex: CEX) => !cex.isDisabled()) as CEXList
 
-    pickCEXForPair = (pair: Pair): CEX | null => {
+    filterAvailableCEXForPair = (pair: Pair): CEXList => {
         const unsupportedCEXes = failRequestHistory.filterByPairAndCodeAfterTime(pair, UNFOUND_PAIR_ERROR_CODE, RETRY_LOOKING_FOR_PAIR_INTERVAL).uniqueCEXes()
-        const cex = this.filterByEnabled().excludeCEXes(unsupportedCEXes as TCEX[]).orderByRequestCountAsc().first()
-        return cex as CEX || null
+        return this.filterByEnabled().excludeCEXes(unsupportedCEXes as TCEX[])
+    }
+
+    pickCEXForPair = (pair: Pair): CEX | null => {
+        return this.filterAvailableCEXForPair(pair).orderByRequestCountAsc().first() as CEX | null
     }
 
     orderByRequestCountAsc = () => this.orderBy((c: CEX) => c.get().requestCount(), 'asc') as CEXList

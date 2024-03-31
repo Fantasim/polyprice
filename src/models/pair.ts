@@ -18,11 +18,38 @@ export class Pair extends Model {
         super(state, options)
     }
 
+    //Returns true if the pair has been tried to be fetched from all the CEXes and failed
+    isTrash = () => {
+        const { cexList } = controller
+        const activeCEXCount = cexList.count()
+        const sixHoursAgo = Date.now() - 6 * 60 * 60 * 1000 // 6 hours
+
+        const priceHistory = this.get().priceHistoryList()
+        //if there is no price history instance, it means the pair has been removed so it is trash
+        if (!priceHistory)
+            return true
+
+        const price = priceHistory.filterAfterTime(Date.now() - sixHoursAgo)
+        if (price.count() === 0){
+            const list = failRequestHistory.filterByPairAndCodeAfterTime(this, UNFOUND_PAIR_ERROR_CODE, Date.now() - RETRY_LOOKING_FOR_PAIR_INTERVAL).uniqueCEXes()
+            return list.length >= activeCEXCount
+        }
+        return false
+    }
+
+
+    //Returns true if the last price is older than the interval
     needToBeFetched = (interval: number) => {
-        const lastPrice = this.get().priceHistoryList().findLastPrice()
+        const historyList = this.get().priceHistoryList()
+        //if there is no price history instance, it means the pair has been removed
+        if (!historyList)
+            return false
+
+        const lastPrice = historyList.findLastPrice()
         return !lastPrice || lastPrice.wasItMoreThanTimeAgo(interval)
     }   
 
+    //Fetches the last price from the CEX that has the pair
     fetchLastPriceIfNeeded = (interval: number, log?: ((o: any) => void)) => {
         const { cexList } = controller
         if (this.needToBeFetched(interval)){
@@ -51,29 +78,6 @@ export class PairList extends Collection {
 
     filterByPriceFetchRequired = (interval: number) => {
         return this.filter((pair: Pair) => pair.needToBeFetched(interval)) as PairList
-    }
-
-    deleteByID = (id: string) => {
-        return this.deleteBy((pair: Pair) => {
-            return pair.get().id() === id
-        })
-    }
-
-    purgePairIfUnfound = (pair: Pair, log?: ((o: any) => void)) => {
-        const { cexList } = controller
-        const activeCEXCount = cexList.count()
-            
-        const sixHoursAgo = Date.now() - 6 * 60 * 60 * 1000 // 6 hours
-        const price = pair.get().priceHistoryList().filterAfterTime(Date.now() - sixHoursAgo)
-        if (price.count() === 0){
-            const list = failRequestHistory.filterByPairAndCodeAfterTime(pair, UNFOUND_PAIR_ERROR_CODE, Date.now() - RETRY_LOOKING_FOR_PAIR_INTERVAL).uniqueCEXes()
-            if (list.length >= activeCEXCount){
-                this.deleteByID(pair.get().id()).store()
-                log && log(`Pair ${pair.get().id()} removed`)
-                return true
-            }
-        }
-        return false
     }
 
     findByPair = (symbol0: string, symbol1: string) => {
