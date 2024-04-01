@@ -47,20 +47,20 @@ export class Pair extends Model {
     }
 
     //Returns true if the last price is older than the interval
-    needToBeFetched = (interval: number) => {
+    needToBeFetched = () => {
         const historyList = this.get().priceHistoryList()
         //if there is no price history instance, it means the pair has been removed
         if (!historyList)
             return false
 
         const lastPrice = historyList.findLastPrice()
-        return !lastPrice || lastPrice.wasItMoreThanTimeAgo(interval)
+        return !lastPrice || lastPrice.wasItMoreThanTimeAgo(controller.getMinFetchInterval())
     }   
 
     //Fetches the last price from the CEX that has the pair
-    fetchLastPriceIfNeeded = (interval: number) => {
+    fetchLastPriceIfNeeded = () => {
         const { cexList } = controller
-        if (this.needToBeFetched(interval)){
+        if (this.needToBeFetched()){
             const cex = cexList.pickCEXForPair(this)
             return cex ? cex.fetchLastPrice(this) : null
         }
@@ -88,8 +88,8 @@ export class PairList extends Collection {
         return this.filter((pair: Pair) => pair.get().symbol0() === symbol.toLowerCase() || pair.get().symbol1() === symbol.toLowerCase()) as PairList
     }
 
-    filterByPriceFetchRequired = (interval: number) => {
-        return this.filter((pair: Pair) => pair.needToBeFetched(interval)) as PairList
+    filterByPriceFetchRequired = () => {
+        return this.filter((pair: Pair) => pair.needToBeFetched()) as PairList
     }
 
     findByPair = (symbol0: string, symbol1: string) => {

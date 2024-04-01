@@ -2,7 +2,7 @@ import {config, manager }from 'acey'
 import { CEX, CEXList, TCEX, newCexList } from './models/cex'
 import { Pair, PairList } from './models/pair'
 import { PriceHistoryList } from './models/price-history'
-import { CEX_LIST, MAX_FETCH_BATCH_SIZE, SECOND_INTERVAL_BETWEEN_FETCH_BATCH } from './constant'
+import { CEX_LIST, FETCH_BATCH_SIZE } from './constant'
 import { failRequestHistory } from './models/fail-history'
 
 class Controller {
@@ -12,6 +12,8 @@ class Controller {
     public pairList: PairList = new PairList([], {key: 'polyprice-pairs', connected: true})
     public priceHistoryMap: {[key: string]: PriceHistoryList} = {}
     private _onPriceUpdate?: (symbol0: string, symbol1: string, price: number) => void 
+
+    private _fetchingSettings: {max_request_count_per_second: number, min_fetch_interval_ms: number} | null = null
 
     constructor(){
         this.cexList = newCexList(CEX_LIST)
@@ -29,6 +31,21 @@ class Controller {
     printRegularLog = (...msg: any) => {
         if (this._logging === 'all')
             console.log(...msg)
+    }
+
+    getMaxRequestCountPerSecond = () => {
+        return this._fetchingSettings?.max_request_count_per_second || 1
+    }
+
+    getMinFetchInterval = () => {
+        return this._fetchingSettings?.min_fetch_interval_ms || 1000
+    }
+
+    setFetchingSettings = (max_request_count_per_second: number, min_fetch_interval_ms: number) => {
+        this._fetchingSettings = {
+            max_request_count_per_second: Math.max(Math.min(CEX_LIST.length, max_request_count_per_second), 0.05), 
+            min_fetch_interval_ms: Math.max(min_fetch_interval_ms, 1000)
+        }
     }
 
     private _printPriceLog = (symbol0: string, symbol1: string, price: number) => {
@@ -129,11 +146,11 @@ class Controller {
         return null
     }
 
-    refreshOrClearPair = async (fetchInterval: number) => {
-        const list = this.pairList.filterByPriceFetchRequired(fetchInterval)
-        for (let i = 0; i < Math.min(list.count(), MAX_FETCH_BATCH_SIZE); i++){
+    refreshOrClearPair = async (batchSize: number) => {
+        const list = this.pairList.filterByPriceFetchRequired()
+        for (let i = 0; i < Math.min(list.count(), batchSize); i++){
             const pair = list.nodeAt(i) as Pair
-            await pair.fetchLastPriceIfNeeded(fetchInterval)
+            await pair.fetchLastPriceIfNeeded()
         }
     }
 
@@ -147,18 +164,15 @@ export const controller = new Controller()
 
 export interface PolyPriceOptions {
     local_storage?: any
-    //default: 10 minutes
-    interval_pair_price_request_ms?: number
     //cexes to ignore
     ignore_cexes?: TCEX[]
     //default: 0 (never)
-    max_age_price_history_before_purge_ms?: number
+    price_history_expiration_ms?: number
     logging: 'none' | 'new-price-only' | 'all',
 }
 
 const DEFAULT_OPTIONS: PolyPriceOptions = {
-    interval_pair_price_request_ms: 10 * 60 * 1000, // 10 minutes
-    max_age_price_history_before_purge_ms: 0,
+    price_history_expiration_ms: 0,
     ignore_cexes: [],
     logging: 'new-price-only',
     local_storage: undefined
@@ -178,8 +192,7 @@ export class PolyPrice {
 
     private options = () => {
         return {
-            priceFetchInterval: () => Math.max(this._options.interval_pair_price_request_ms || 0, 60 * 1000), // 1 minute minimum
-            removePriceHistoryInterval: () => Math.max(this._options.max_age_price_history_before_purge_ms || 0, 0), // 0 means never
+            removePriceHistoryInterval: () => Math.max(this._options.price_history_expiration_ms || 0, 0), // 0 means never
             fullLogginEnabled: () => this._options.logging === 'all',
             disactivedCEXes: () => this._options.ignore_cexes || [],
         }
@@ -205,16 +218,16 @@ export class PolyPrice {
     allPairsWithSymbol = (symbol: string) => controller.pairList.filterBySymbol(symbol)
 
     private _runIntervals = () => {
-        this._log(`Auto fetching process will start in ${SECOND_INTERVAL_BETWEEN_FETCH_BATCH} seconds`)
+        const interval = (1 / controller.getMaxRequestCountPerSecond()) * FETCH_BATCH_SIZE
 
         this._intervalPairPriceFetch = setInterval(async () => {
             const count = failRequestHistory.count()
-            await controller.refreshOrClearPair(this.options().priceFetchInterval())
+            await controller.refreshOrClearPair(FETCH_BATCH_SIZE)
             if (count < failRequestHistory.count())
                 failRequestHistory.action().store()
-        }, SECOND_INTERVAL_BETWEEN_FETCH_BATCH * 1000)
+        }, interval * 1000)
 
-        this._log('Pair price fetch interval is ' + this.options().priceFetchInterval() / 1000 + ' seconds')
+        this._log('Min pair price fetch interval is ' + (controller.getMinFetchInterval() / 1000).toFixed(1) + ' seconds')
 
         const removeInterval = this.options().removePriceHistoryInterval()
         if (removeInterval)
@@ -229,11 +242,12 @@ export class PolyPrice {
         this._log('Intervals cleared')
     }
 
-    run = async () => {
+    run = async (minFetchInterval: number, maxRequestCountPerSecond: number) => {
         if (this._running)
             return
         await config.done()
         this._running = true
+        controller.setFetchingSettings(maxRequestCountPerSecond, minFetchInterval)
         controller.purgePriceHistories(this.options().removePriceHistoryInterval())
         this._runIntervals()
         this._log('PolyPrice started')
