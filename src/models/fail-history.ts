@@ -91,4 +91,4 @@ export class FailHistoryList extends Collection {
     }
 }
 
-export const failRequestHistory = new FailHistoryList([], {key: 'fail-history', connected: true})
+export const failRequestHistory = new FailHistoryList([], {key: 'polyprice-fail-history', connected: true})

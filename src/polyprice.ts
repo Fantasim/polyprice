@@ -9,7 +9,7 @@ class Controller {
 
     private _logging: 'none' | 'new-price-only' | 'all' = 'none'
     public cexList: CEXList
-    public pairList: PairList = new PairList([], {key: 'pairs', connected: true})
+    public pairList: PairList = new PairList([], {key: 'polyprice-pairs', connected: true})
     public priceHistoryMap: {[key: string]: PriceHistoryList} = {}
 
     constructor(){
@@ -17,7 +17,7 @@ class Controller {
 
         this.pairList.watch().localStoreFetch(() => {
             this.pairList.forEach((pair) => {
-                const history = new PriceHistoryList([], {key: pair.get().id(), connected: true})
+                const history = new PriceHistoryList([], {key: 'polyprice-'+pair.get().id(), connected: true})
                 manager.connectModel(history)
                 this.priceHistoryMap[pair.get().id()] = history
             })
@@ -82,7 +82,7 @@ class Controller {
         res.store()
 
         const pair = pairList.last() as Pair
-        const history = new PriceHistoryList([], {key: pair.get().id(), connected: true})
+        const history = new PriceHistoryList([], {key: 'polyprice-' + pair.get().id(), connected: true})
         manager.connectModel(history)
         priceHistoryMap[pair.get().id()] = history
         return pair
@@ -103,7 +103,7 @@ class Controller {
 
             delete this.priceHistoryMap[key]
             //remove the price history from the local storage
-            manager.localStoreManager().removeKey(key)
+            manager.localStoreManager().removeKey('polyprice-' + key)
 
             this.printRegularLog(`Price history of ${pair.get().id()} removed`)
 
