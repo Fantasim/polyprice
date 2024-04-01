@@ -15,7 +15,6 @@ const DB_PATH = './.db'
 const poly = new PolyPrice({
     local_storage: new LocalStorage(DB_PATH),  
     logging: 'new-price-only',
-    interval_pair_price_request_ms: 3600 * 1000 // 1 hour
 })
 
 const main = () => {
@@ -28,7 +27,7 @@ const main = () => {
         })
 
         it('Poly sync DB', async () => {
-            await poly.run()
+            await poly.run(5000_000, 1.0)
         })
     })
 
