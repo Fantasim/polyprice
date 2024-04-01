@@ -192,6 +192,7 @@ export class PolyPrice {
         
         controller.setCEXList(this.options().disactivedCEXes())
         controller.setLogging(this._options.logging)
+        onPriceUpdate && controller.setOnPriceUpdate(onPriceUpdate)
     }
 
     clearFailHistory = () => {
