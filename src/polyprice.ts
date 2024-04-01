@@ -2,7 +2,7 @@ import {config, manager }from 'acey'
 import { CEX, CEXList, TCEX, newCexList } from './models/cex'
 import { Pair, PairList } from './models/pair'
 import { PriceHistoryList } from './models/price-history'
-import { CEX_LIST } from './constant'
+import { CEX_LIST, MAX_FETCH_BATCH_SIZE, SECOND_INTERVAL_BETWEEN_FETCH_BATCH } from './constant'
 import { failRequestHistory } from './models/fail-history'
 
 class Controller {
@@ -46,7 +46,7 @@ class Controller {
             const currentTime = `\x1b[90m${new Date().toLocaleTimeString()}\x1b[0m`; // Grey color for time stamp
     
             // Construct the log message with color formatting for symbols
-            const logMessage = `[\x1b[90mpolyprice\x1b[0m - ${currentTime}] 1 \x1b[38;5;${colorMap[symbol0]}m${symbol0} \x1b[0m= \x1b[1m${price.toFixed(2)} \x1b[38;5;${colorMap[symbol1]}m${symbol1}\x1b[0m`;
+            const logMessage = `[\x1b[90mpolyprice\x1b[0m - ${currentTime}] 1 \x1b[38;5;${colorMap[symbol0]}m${symbol0} \x1b[0m= \x1b[1m${price.toFixed(4)} \x1b[38;5;${colorMap[symbol1]}m${symbol1}\x1b[0m`;
     
             // Print the log message
             console.log(logMessage);
@@ -130,9 +130,8 @@ class Controller {
     }
 
     refreshOrClearPair = async (fetchInterval: number) => {
-        const MAXIMUM_FETCH_PER_BATCH = 10
         const list = this.pairList.filterByPriceFetchRequired(fetchInterval)
-        for (let i = 0; i < Math.min(list.count(), MAXIMUM_FETCH_PER_BATCH); i++){
+        for (let i = 0; i < Math.min(list.count(), MAX_FETCH_BATCH_SIZE); i++){
             const pair = list.nodeAt(i) as Pair
             await pair.fetchLastPriceIfNeeded(fetchInterval)
         }
@@ -206,15 +205,14 @@ export class PolyPrice {
     allPairsWithSymbol = (symbol: string) => controller.pairList.filterBySymbol(symbol)
 
     private _runIntervals = () => {
-        const REFRESH_TIME = 20_000
-        this._log(`Auto fetching process will start in ${REFRESH_TIME / 1000} seconds`)
+        this._log(`Auto fetching process will start in ${SECOND_INTERVAL_BETWEEN_FETCH_BATCH} seconds`)
 
         this._intervalPairPriceFetch = setInterval(async () => {
             const count = failRequestHistory.count()
             await controller.refreshOrClearPair(this.options().priceFetchInterval())
             if (count < failRequestHistory.count())
                 failRequestHistory.action().store()
-        }, REFRESH_TIME)
+        }, SECOND_INTERVAL_BETWEEN_FETCH_BATCH * 1000)
 
         this._log('Pair price fetch interval is ' + this.options().priceFetchInterval() / 1000 + ' seconds')
 

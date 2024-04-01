@@ -10,6 +10,10 @@ export const UNABLE_TO_REACH_SERVER_ERROR_CODE = 500
 //if pair is not found on an exchange, retry looking for it after this interval
 export const RETRY_LOOKING_FOR_PAIR_INTERVAL = 30 * 24 * 60 * 60 * 1000 // 30 days
 
+//default options so 1.5 request per second maximum on average
+export const SECOND_INTERVAL_BETWEEN_FETCH_BATCH = 12
+export const MAX_FETCH_BATCH_SIZE = 18
+
 //CEX
 export const CEX_LIST: TCEX [] = ['binance', 'coinbase', 'kraken', 'gemini', 'kucoin']
 export const CEX_PRICE_ENDPOINTS: { [key in TCEX]: (symbol0: string, symbol1: string) => string } = {
