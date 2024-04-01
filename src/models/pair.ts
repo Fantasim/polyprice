@@ -84,6 +84,10 @@ export class PairList extends Collection {
         super(state, [Pair, PairList], options)
     }
 
+    filterBySymbol = (symbol: string) => {
+        return this.filter((pair: Pair) => pair.get().symbol0() === symbol.toLowerCase() || pair.get().symbol1() === symbol.toLowerCase()) as PairList
+    }
+
     filterByPriceFetchRequired = (interval: number) => {
         return this.filter((pair: Pair) => pair.needToBeFetched(interval)) as PairList
     }

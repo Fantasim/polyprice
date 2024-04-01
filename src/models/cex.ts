@@ -1,7 +1,7 @@
 import { Model, IModelOptions, Collection } from 'acey'
 import { Pair } from './pair'
 import { failRequestHistory } from './fail-history'
-import { CEX_PRICE_ENDPOINTS, ENDPOINT_DOES_NOT_EXIST_ERROR_CODE, RETRY_LOOKING_FOR_PAIR_INTERVAL, UNFOUND_PAIR_ERROR_CODE } from '../constant'
+import { CEX_PRICE_ENDPOINTS, ENDPOINT_DOES_NOT_EXIST_ERROR_CODE, MAX_REQUESTS_REACHED_ERROR_CODE, RETRY_LOOKING_FOR_PAIR_INTERVAL, UNABLE_TO_PARSE_PRICE_ERROR_CODE, UNFOUND_PAIR_ERROR_CODE } from '../constant'
 import { fetchPrice } from '../fetching-engine'
 
 export type TCEX  = 'binance' | 'coinbase' | 'kraken' | /* 'bitfinex' | 'bitstamp' | */ 'gemini' | 'kucoin'
@@ -45,8 +45,18 @@ export class CEX extends Model {
     fetchLastPrice = async (pair: Pair) => {
         this._requestCount++
         const r = await fetchPrice(this, pair)
-        if (typeof r === 'number' && r === ENDPOINT_DOES_NOT_EXIST_ERROR_CODE) {
-            this.setDisabledUntil(Date.now() * 2) //forever
+        if (typeof r === 'number'){
+            switch (r) {
+                case ENDPOINT_DOES_NOT_EXIST_ERROR_CODE:
+                    this.setDisabledUntil(Date.now() * 2) //forever
+                    break;
+                case MAX_REQUESTS_REACHED_ERROR_CODE:
+                    this.setDisabledUntil(Date.now() + 60 * 1000) // 1 minute
+                    break
+                case UNABLE_TO_PARSE_PRICE_ERROR_CODE:
+                    this.setDisabledUntil(Date.now() * 2) //forever
+                    break;
+            }
         }
         return r
     }

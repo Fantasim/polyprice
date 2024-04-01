@@ -39,28 +39,32 @@ const parseResponse = async (cex: CEX, response: Response, pair: Pair) => {
     let unparsedPrice;
     let code: number = 200;
 
-    switch (cex.get().name()) {
-        case 'binance':
-        case 'coinbase':
-            unparsedPrice = json.price;
-            break;
-        case 'kraken':
-            if (json.error && json.error.length > 0){
-                code = UNFOUND_PAIR_ERROR_CODE;
+    try {
+        switch (cex.get().name()) {
+            case 'binance':
+            case 'coinbase':
+                unparsedPrice = json.price;
                 break;
-            }
-            const keys = Object.keys(json.result);
-            unparsedPrice = json.result[keys[0]].c[0];
-            break;
-        case 'gemini':
-            unparsedPrice = json.last;
-            break;
-        case 'kucoin':
-            if (!!json.data)
-                unparsedPrice = json.data.price;
-            else
-                code = UNFOUND_PAIR_ERROR_CODE;
-            break;
+            case 'kraken':
+                if (json.error && json.error.length > 0){
+                    code = UNFOUND_PAIR_ERROR_CODE;
+                    break;
+                }
+                const keys = Object.keys(json.result);
+                unparsedPrice = json.result[keys[0]].c[0];
+                break;
+            case 'gemini':
+                unparsedPrice = json.last;
+                break;
+            case 'kucoin':
+                if (!!json.data)
+                    unparsedPrice = json.data.price;
+                else
+                    code = UNFOUND_PAIR_ERROR_CODE;
+                break;
+        }
+    } catch (error) {
+        code = UNABLE_TO_PARSE_PRICE_ERROR_CODE;
     }
 
     const priceOrError = safeParsePrice(unparsedPrice);
@@ -80,7 +84,6 @@ const parseResponse = async (cex: CEX, response: Response, pair: Pair) => {
 const handleNon200Response = async (cex: CEX, response: Response, pair: Pair) => {
     switch (response.status) {
         case 429:
-            cex.setDisabledUntil(Date.now() + 60 * 1000) // 1 minute
             return MAX_REQUESTS_REACHED_ERROR_CODE
         case 400:
             failRequestHistory.add(pair, cex.get().name(), UNFOUND_PAIR_ERROR_CODE);

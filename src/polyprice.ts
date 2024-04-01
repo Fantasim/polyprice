@@ -192,6 +192,7 @@ export class PolyPrice {
     addPair = controller.addPair
     removePair = controller.removePair
     findPair = (symbol0: string, symbol1: string): Pair | null => controller.pairList.findByPair(symbol0, symbol1) || null
+    allPairsWithSymbol = (symbol: string) => controller.pairList.filterBySymbol(symbol)
 
     private _runIntervals = () => {
         const REFRESH_TIME = 20_000
