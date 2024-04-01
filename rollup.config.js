@@ -21,6 +21,11 @@ const config = {
     plugins: [
         typescript({
             tsconfig: 'tsconfig.rollup.json',
+            declaration: true,
+            include: [
+                "src/**/*",
+                "index.ts",
+            ]
         }),
         commonjs(),
         uglify(),

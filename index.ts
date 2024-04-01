@@ -1,19 +1,30 @@
-export {
+import {
     PolyPriceOptions,
     PolyPrice
 } from './src/polyprice'
 
-export {
+import {
     CEX,
     CEXList,
 } from './src/models/cex'
 
-export {
+import {
     Pair,
     PairList
 } from './src/models/pair'
 
-export {
+import {
     PriceHistory,
     PriceHistoryList
 } from './src/models/price-history'
+
+export {
+    PolyPriceOptions,
+    PolyPrice,
+    CEX,
+    CEXList,
+    Pair,
+    PairList,
+    PriceHistory,
+    PriceHistoryList
+}
