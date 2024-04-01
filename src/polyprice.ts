@@ -11,6 +11,7 @@ class Controller {
     public cexList: CEXList
     public pairList: PairList = new PairList([], {key: 'polyprice-pairs', connected: true})
     public priceHistoryMap: {[key: string]: PriceHistoryList} = {}
+    private _onPriceUpdate?: (symbol0: string, symbol1: string, price: number) => void 
 
     constructor(){
         this.cexList = newCexList(CEX_LIST)
@@ -30,7 +31,7 @@ class Controller {
             console.log(...msg)
     }
 
-    printPriceLog = (symbol0: string, symbol1: string, price: number) => {
+    private _printPriceLog = (symbol0: string, symbol1: string, price: number) => {
         if (this._logging === 'new-price-only' || this._logging === 'all'){
             const colorMap: { [key: string]: string } = {}; // Map to store color for each symbol
             const symbols = [symbol0, symbol1];
@@ -55,6 +56,15 @@ class Controller {
     setCEXList = (ignore_cexes: TCEX[]) => {
         const filteredList = CEX_LIST.filter((cex) => !ignore_cexes.includes(cex))
         this.cexList.deleteBy((cex: CEX) => !filteredList.includes(cex.get().name()))
+    }
+
+    onPriceUpdate = (symbol0: string, symbol1: string, price: number) => {
+        this._printPriceLog(symbol0, symbol1, price)
+        this._onPriceUpdate && this._onPriceUpdate(symbol0, symbol1, price)
+    }
+
+    setOnPriceUpdate = (onPriceUpdate: (symbol0: string, symbol1: string, price: number) => void) => {
+        this._onPriceUpdate = onPriceUpdate
     }
 
      purgePriceHistories = (rmPairPriceHistoryInterval: number) => {
@@ -144,7 +154,7 @@ export interface PolyPriceOptions {
     ignore_cexes?: TCEX[]
     //default: 0 (never)
     max_age_price_history_before_purge_ms?: number
-    logging: 'none' | 'new-price-only' | 'all'
+    logging: 'none' | 'new-price-only' | 'all',
 }
 
 const DEFAULT_OPTIONS: PolyPriceOptions = {
@@ -176,7 +186,7 @@ export class PolyPrice {
         }
     }
 
-    constructor(options: PolyPriceOptions){
+    constructor(options: PolyPriceOptions, onPriceUpdate?: (symbol0: string, symbol1: string, price: number) => void){
         options.local_storage && config.setStoreEngine(options.local_storage)
         this._options = Object.assign({}, DEFAULT_OPTIONS, options)
         

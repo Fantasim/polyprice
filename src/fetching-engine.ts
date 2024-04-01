@@ -69,8 +69,7 @@ const parseResponse = async (cex: CEX, response: Response, pair: Pair) => {
 
     const priceOrError = safeParsePrice(unparsedPrice);
     if (typeof priceOrError === 'number' && code === 200) {
-        controller.printPriceLog(pair.get().symbol0(), pair.get().symbol1(), priceOrError);
-       
+        controller.onPriceUpdate(pair.get().symbol0(), pair.get().symbol1(), priceOrError);
         const historyList = pair.get().priceHistoryList()
         //if there is no price history instance, it means the pair has been removed
         historyList && historyList.add(priceOrError, cex.get().name()).store();
