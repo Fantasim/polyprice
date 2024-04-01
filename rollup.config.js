@@ -20,8 +20,7 @@ const config = {
     ],
     plugins: [
         typescript({
-            tsconfig: 'tsconfig.json',
-            // tsconfigOverride: { compilerOptions: { module: 'ES2020' } },
+            tsconfig: 'tsconfig.rollup.json',
         }),
         commonjs(),
         uglify(),
