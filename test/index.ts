@@ -29,7 +29,7 @@ const main = () => {
         })
 
         it('Poly sync DB', async () => {
-            await poly.run(5000_000, 1.0)
+            await poly.run(5000_000, 0.1)
         })
     })
 
@@ -40,7 +40,7 @@ const main = () => {
             const { cexList, pairList } = controller
             const initilFailHistoryCount = failRequestHistory.count()
 
-            const pair = poly.addPair('USDT', 'ETH') as Pair
+            const pair = await poly.addPair('USDT', 'ETH') as Pair
             const totalPairs = pairList.count()
 
             expect(pair).to.be.instanceOf(Pair)
@@ -53,7 +53,7 @@ const main = () => {
                 //we reanabled the cex
                 cex.setDisabledUntil(0)
                 
-                failRequestHistory.add(pair, cex.get().name(), UNFOUND_PAIR_ERROR_CODE)
+                await failRequestHistory.add(pair, cex.get().name(), UNFOUND_PAIR_ERROR_CODE)
 
                 const f = failRequestHistory.first() as FailHistory
                 expect(f).to.be.instanceOf(FailHistory)
@@ -76,10 +76,10 @@ const main = () => {
             }
         })
 
-        it ('Check CEX picking for pair fetching', () => {
+        it ('Check CEX picking for pair fetching', async () => {
             const { cexList } = controller
 
-            const pair = poly.addPair('LINK', 'USDT') as Pair
+            const pair = await poly.addPair('LINK', 'USDT') as Pair
             expect(pair).to.be.instanceOf(Pair)
             expect(pair.get().id()).to.eq('link-usdt')
             expect(pair.get().priceHistoryList().count()).to.eq(0)
@@ -94,7 +94,7 @@ const main = () => {
                     pair.get().priceHistoryList().add(18.55, cex.get().name()).store()
                     availableCEXes.push(cex.get().name())
                 } else {
-                    failRequestHistory.add(pair, cex.get().name(), UNFOUND_PAIR_ERROR_CODE).store()
+                    (await failRequestHistory.add(pair, cex.get().name(), UNFOUND_PAIR_ERROR_CODE)).store()
                 }
             }
             const availableCEXes2 = cexList.filterAvailableCEXForPair(pair)

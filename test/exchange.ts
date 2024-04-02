@@ -37,7 +37,7 @@ export const runExchangeTests = (poly: PolyPrice) => {
 
         it('BTC-USDT', async () => {
             //BTC-USDT
-            const pair = poly.addPair('BTC', 'USDT') as Pair
+            const pair = await poly.addPair('BTC', 'USDT') as Pair
             expect(pair).to.be.instanceOf(Pair)
 
             const r = await exchange.fetchLastPrice(pair)
@@ -47,7 +47,7 @@ export const runExchangeTests = (poly: PolyPrice) => {
 
         it('XXK-YYQ (non existant)', async () => {
             //UNEXISTING PAIR
-            const pair = poly.addPair('YYY', 'WWW') as Pair
+            const pair = await poly.addPair('YYY', 'WWW') as Pair
             expect(pair).to.be.instanceOf(Pair)
 
             const r = await exchange.fetchLastPrice(pair)
@@ -55,7 +55,7 @@ export const runExchangeTests = (poly: PolyPrice) => {
         })
 
         it('wrong endpoint', async () => {
-            const pair = poly.addPair('BTC', 'USDT') as Pair
+            const pair = await poly.addPair('BTC', 'USDT') as Pair
             expect(pair).to.be.instanceOf(Pair)
 
             CEX_PRICE_ENDPOINTS[NAME] = (symbol0, symbol1) => `https://api.pro.coinbase.com/or/what/blabla/${symbol0}-${symbol1}`
@@ -77,7 +77,7 @@ export const runExchangeTests = (poly: PolyPrice) => {
 
         it('BTC-USDT', async () => {
             //BTC-USDT
-            const pair = poly.addPair('BTC', 'USDT') as Pair
+            const pair = await poly.addPair('BTC', 'USDT') as Pair
             expect(pair).to.be.instanceOf(Pair)
 
             const r = await exchange.fetchLastPrice(pair)
@@ -87,7 +87,7 @@ export const runExchangeTests = (poly: PolyPrice) => {
 
         it('XXK-YYQ (non existant)', async () => {
             //UNEXISTING PAIR
-            const pair = poly.addPair('YYY', 'WWW') as Pair
+            const pair = await poly.addPair('YYY', 'WWW') as Pair
             expect(pair).to.be.instanceOf(Pair)
 
             const r = await exchange.fetchLastPrice(pair)
@@ -95,7 +95,7 @@ export const runExchangeTests = (poly: PolyPrice) => {
         })
 
         it('wrong endpoint', async () => {
-            const pair = poly.addPair('BTC', 'USDT') as Pair
+            const pair = await poly.addPair('BTC', 'USDT') as Pair
             expect(pair).to.be.instanceOf(Pair)
 
             CEX_PRICE_ENDPOINTS[NAME] = (symbol0, symbol1) => `https://api.binance.com/or/what/blabla/${symbol0}-${symbol1}`
@@ -116,7 +116,7 @@ export const runExchangeTests = (poly: PolyPrice) => {
 
         it('BTC-USDT', async () => {
             //BTC-USDT
-            const pair = poly.addPair('BTC', 'USDT') as Pair
+            const pair = await poly.addPair('BTC', 'USDT') as Pair
             expect(pair).to.be.instanceOf(Pair)
 
             const r = await exchange.fetchLastPrice(pair)
@@ -126,7 +126,7 @@ export const runExchangeTests = (poly: PolyPrice) => {
 
         it('XXK-YYQ (non existant)', async () => {
             //UNEXISTING PAIR
-            const pair = poly.addPair('YYY', 'WWW') as Pair
+            const pair = await poly.addPair('YYY', 'WWW') as Pair
             expect(pair).to.be.instanceOf(Pair)
 
             const r = await exchange.fetchLastPrice(pair)
@@ -134,7 +134,7 @@ export const runExchangeTests = (poly: PolyPrice) => {
         })
 
         it('wrong endpoint', async () => {
-            const pair = poly.addPair('BTC', 'USDT') as Pair
+            const pair = await poly.addPair('BTC', 'USDT') as Pair
             expect(pair).to.be.instanceOf(Pair)
 
             CEX_PRICE_ENDPOINTS[NAME] = (symbol0, symbol1) => `https://api.kraken.com/or/what/blabla/${symbol0}-${symbol1}`
@@ -155,7 +155,7 @@ export const runExchangeTests = (poly: PolyPrice) => {
 
         it('BTC-USDT', async () => {
             //BTC-USDT
-            const pair = poly.addPair('BTC', 'USDT') as Pair
+            const pair = await poly.addPair('BTC', 'USDT') as Pair
             expect(pair).to.be.instanceOf(Pair)
 
             const r = await exchange.fetchLastPrice(pair)
@@ -165,7 +165,7 @@ export const runExchangeTests = (poly: PolyPrice) => {
 
         it('XXK-YYQ (non existant)', async () => {
             //UNEXISTING PAIR
-            const pair = poly.addPair('YYY', 'WWW') as Pair
+            const pair = await poly.addPair('YYY', 'WWW') as Pair
             expect(pair).to.be.instanceOf(Pair)
 
             const r = await exchange.fetchLastPrice(pair)
@@ -173,7 +173,7 @@ export const runExchangeTests = (poly: PolyPrice) => {
         })
 
         it('wrong endpoint', async () => {
-            const pair = poly.addPair('BTC', 'USDT') as Pair
+            const pair = await poly.addPair('BTC', 'USDT') as Pair
             expect(pair).to.be.instanceOf(Pair)
 
             CEX_PRICE_ENDPOINTS[NAME] = (symbol0, symbol1) => `https://api.gemini.com/or/what/blabla/${symbol0}-${symbol1}`
@@ -194,7 +194,7 @@ export const runExchangeTests = (poly: PolyPrice) => {
 
         it('BTC-USDT', async () => {
             //BTC-USDT
-            const pair = poly.addPair('BTC', 'USDT') as Pair
+            const pair = await poly.addPair('BTC', 'USDT') as Pair
             expect(pair).to.be.instanceOf(Pair)
 
             const r = await exchange.fetchLastPrice(pair)
@@ -204,7 +204,7 @@ export const runExchangeTests = (poly: PolyPrice) => {
 
         it('XXK-YYQ (non existant)', async () => {
             //UNEXISTING PAIR
-            const pair = poly.addPair('YYY', 'WWW') as Pair
+            const pair = await poly.addPair('YYY', 'WWW') as Pair
             expect(pair).to.be.instanceOf(Pair)
 
             const r = await exchange.fetchLastPrice(pair)
@@ -212,7 +212,7 @@ export const runExchangeTests = (poly: PolyPrice) => {
         })
 
         it('wrong endpoint', async () => {
-            const pair = poly.addPair('BTC', 'USDT') as Pair
+            const pair = await poly.addPair('BTC', 'USDT') as Pair
             expect(pair).to.be.instanceOf(Pair)
 
             CEX_PRICE_ENDPOINTS[NAME] = (symbol0, symbol1) => `https://api.kucoin.com/or/what/blabla/${symbol0}-${symbol1}`

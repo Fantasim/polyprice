@@ -2,7 +2,8 @@ import fs from 'fs'
 
 import {
     PolyPriceOptions,
-    PolyPrice
+    PolyPrice,
+    controller
 } from './src/polyprice'
 
 import {

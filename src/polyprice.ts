@@ -4,6 +4,7 @@ import { Pair, PairList } from './models/pair'
 import { PriceHistoryList } from './models/price-history'
 import { CEX_LIST, FETCH_BATCH_SIZE } from './constant'
 import { failRequestHistory } from './models/fail-history'
+import _ from 'lodash'
 
 class Controller {
 
@@ -48,7 +49,7 @@ class Controller {
         }
     }
 
-    private _printPriceLog = (symbol0: string, symbol1: string, price: number) => {
+    private _printPriceLog = (symbol0: string, symbol1: string, price: number, cex: TCEX) => {
         if (this._logging === 'new-price-only' || this._logging === 'all'){
             const colorMap: { [key: string]: string } = {}; // Map to store color for each symbol
             const symbols = [symbol0, symbol1];
@@ -63,7 +64,7 @@ class Controller {
             const currentTime = `\x1b[90m${new Date().toLocaleTimeString()}\x1b[0m`; // Grey color for time stamp
     
             // Construct the log message with color formatting for symbols
-            const logMessage = `[\x1b[90mpolyprice\x1b[0m - ${currentTime}] 1 \x1b[38;5;${colorMap[symbol0]}m${symbol0} \x1b[0m= \x1b[1m${price.toFixed(4)} \x1b[38;5;${colorMap[symbol1]}m${symbol1}\x1b[0m`;
+            const logMessage = `[\x1b[90m${cex}\x1b[0m : ${currentTime}] 1 \x1b[38;5;${colorMap[symbol0]}m${symbol0} \x1b[0m= \x1b[1m${price.toFixed(4)} \x1b[38;5;${colorMap[symbol1]}m${symbol1}\x1b[0m`;
     
             // Print the log message
             console.log(logMessage);
@@ -75,8 +76,8 @@ class Controller {
         this.cexList.deleteBy((cex: CEX) => !filteredList.includes(cex.get().name()))
     }
 
-    onPriceUpdate = (symbol0: string, symbol1: string, price: number) => {
-        this._printPriceLog(symbol0, symbol1, price)
+    onPriceUpdate = (symbol0: string, symbol1: string, price: number, cex: TCEX) => {
+        this._printPriceLog(symbol0, symbol1, price, cex)
         this._onPriceUpdate && this._onPriceUpdate(symbol0, symbol1, price)
     }
 
@@ -110,7 +111,7 @@ class Controller {
 
         const pair = pairList.last() as Pair
         const history = new PriceHistoryList([], {key: 'polyprice-' + pair.get().id(), connected: true})
-        manager.connectModel(history)
+        // manager.connectModel(history)
         priceHistoryMap[pair.get().id()] = history
         return pair
     }
@@ -173,7 +174,7 @@ export interface PolyPriceOptions {
     ignore_cexes?: TCEX[]
     //default: 0 (never)
     price_history_expiration_ms?: number
-    logging: 'none' | 'new-price-only' | 'all',
+    logging?: 'none' | 'new-price-only' | 'all',
 }
 
 const DEFAULT_OPTIONS: PolyPriceOptions = {
@@ -189,7 +190,7 @@ export class PolyPrice {
     private _options: PolyPriceOptions
     private _intervalPairPriceFetch: any
     private _intervalPairPriceHistoryRemove: any
-    private _hasOptimizationBoxOpen = true
+    private _cpuOtimizationEnabled = true
 
     private _log = (...msg: any) => {
         if (this.options().fullLogginEnabled())
@@ -209,27 +210,27 @@ export class PolyPrice {
         this._options = Object.assign({}, DEFAULT_OPTIONS, options)
         
         controller.setCEXList(this.options().disactivedCEXes())
-        controller.setLogging(this._options.logging)
+        controller.setLogging(this._options.logging || 'new-price-only')
         onPriceUpdate && controller.setOnPriceUpdate(onPriceUpdate)
     }
 
-    //When you call this function price and fail history won't be automatically stored in json files on each change (as it is by default) but only when you call storeData.
-    openOptimizationBox = () => {
-        this._hasOptimizationBoxOpen = true
-        return {
-            close: () => this._hasOptimizationBoxOpen = false,
-            storeData: () => {
-                failRequestHistory.action().store()
-                controller.pairList.forEach((pair) => {
-                    pair.get().priceHistoryList().action().store()
-                })
-            }
-        }
+    /* Enable CPU optimization to reduce the number of storage operations
+        If enabled, the price and fail history won't be be updated in the local storage
+        you'd have to call updateDataInJSON() to update the data in the local storage
+    */
+    enableCPUOptimization = () => {
+        this._cpuOtimizationEnabled = true
     }
 
-    clearFailHistory = (areYouSure: boolean) => {
+    updateDataInJSON = async () => {
+        return Promise.allSettled([failRequestHistory.action().store(), ...controller.pairList.map((pair) => {
+            return pair.get().priceHistoryList().action().store()
+        })])
+    }
+
+    clearFailHistory = async (areYouSure: boolean) => {
         if (areYouSure){
-            failRequestHistory.setState([]).store()
+            await failRequestHistory.setState([]).store()
             this._log('Fail history erased')
         }
     }
@@ -246,9 +247,9 @@ export class PolyPrice {
             
             let hasFailedOnce = false
             const selectedPairs = controller.pairList.filterByPriceFetchRequired().slice(0, FETCH_BATCH_SIZE) as PairList
-            const res = await Promise.all(controller.refreshOrClearPair(selectedPairs))
+            const res = await Promise.allSettled(controller.refreshOrClearPair(selectedPairs))
             
-            if (!this._hasOptimizationBoxOpen){
+            if (!this._cpuOtimizationEnabled){
                 res.forEach((r, idx: number) => {
                     if (r && typeof r === 'object')
                         (selectedPairs.nodeAt(idx) as Pair).get().priceHistoryList().action().store()
