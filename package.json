@@ -1,6 +1,6 @@
 {
   "name": "polyprice",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Minimalistic real-time crypto price tracker. (no API key needed)",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
