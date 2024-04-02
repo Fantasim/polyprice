@@ -17,6 +17,8 @@ const poly = new PolyPrice({
     logging: 'new-price-only',
 })
 
+
+
 const main = () => {
 
     describe('Instance', async () => {
@@ -106,3 +108,4 @@ const main = () => {
 }
 
 main()
+
