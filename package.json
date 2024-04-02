@@ -1,6 +1,6 @@
 {
   "name": "polyprice",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "Minimalistic real-time crypto price tracker. (no API key needed)",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -32,7 +32,7 @@
     "typescript": "^4.7.4"
   },
   "dependencies": {
-    "acey": "^1.6.1",
+    "acey": "^1.6.3",
     "node-fetch-native": "^1.6.4"
   }
 }
