@@ -41,6 +41,7 @@ export class PriceHistoryList extends Collection {
         super(state, [PriceHistory, PriceHistoryList], options)
     }
 
+    //TO STORE
     removePriceBeforeTime = (limit: number) => {
         let count = 0
         this.deleteBy((priceHistory: PriceHistory) => {
@@ -50,7 +51,7 @@ export class PriceHistoryList extends Collection {
             }
             return false
         })
-        count > 0 && this.action().store()
+        return count
     }
 
     filterByCEX = (cex: TCEX) => {      
@@ -75,6 +76,7 @@ export class PriceHistoryList extends Collection {
         return this.first() as PriceHistory || null
     }
 
+    //TO STORE
     add = (price: number, cex: TCEX) => {
         const ph: IPriceHistory ={
             price,

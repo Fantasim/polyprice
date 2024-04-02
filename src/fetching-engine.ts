@@ -72,7 +72,7 @@ const parseResponse = async (cex: CEX, response: Response, pair: Pair) => {
         controller.onPriceUpdate(pair.get().symbol0(), pair.get().symbol1(), priceOrError);
         const historyList = pair.get().priceHistoryList()
         //if there is no price history instance, it means the pair has been removed
-        historyList && historyList.add(priceOrError, cex.get().name()).store();
+        historyList && historyList.add(priceOrError, cex.get().name())
         return {cex: cex.get().name(), price: priceOrError}
     } else {
         failRequestHistory.add(pair, cex.get().name(), code === 200 ? UNABLE_TO_PARSE_PRICE_ERROR_CODE : code)

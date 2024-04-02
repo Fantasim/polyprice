@@ -146,12 +146,17 @@ class Controller {
         return null
     }
 
-    refreshOrClearPair = async (batchSize: number) => {
-        const list = this.pairList.filterByPriceFetchRequired()
-        for (let i = 0; i < Math.min(list.count(), batchSize); i++){
+    refreshOrClearPair = (list: PairList) => {
+        const ret: Promise<number | {
+            cex: TCEX;
+            price: number;
+        } | null>[] = []
+        for (let i = 0; i < list.count(); i++){
             const pair = list.nodeAt(i) as Pair
-            await pair.fetchLastPriceIfNeeded()
+            const prom = pair.fetchLastPriceIfNeeded()
+            prom ? ret.push(prom) : ret.push(Promise.resolve(null))
         }
+        return ret
     }
 
     setLogging = (logging: 'none' | 'new-price-only' | 'all') => {
@@ -184,6 +189,7 @@ export class PolyPrice {
     private _options: PolyPriceOptions
     private _intervalPairPriceFetch: any
     private _intervalPairPriceHistoryRemove: any
+    private _hasOptimizationBoxOpen = true
 
     private _log = (...msg: any) => {
         if (this.options().fullLogginEnabled())
@@ -207,9 +213,25 @@ export class PolyPrice {
         onPriceUpdate && controller.setOnPriceUpdate(onPriceUpdate)
     }
 
-    clearFailHistory = () => {
-        failRequestHistory.setState([]).store()
-        this._log('Fail history erased')
+    //When you call this function price and fail history won't be automatically stored in json files on each change (as it is by default) but only when you call storeData.
+    openOptimizationBox = () => {
+        this._hasOptimizationBoxOpen = true
+        return {
+            close: () => this._hasOptimizationBoxOpen = false,
+            storeData: () => {
+                failRequestHistory.action().store()
+                controller.pairList.forEach((pair) => {
+                    pair.get().priceHistoryList().action().store()
+                })
+            }
+        }
+    }
+
+    clearFailHistory = (areYouSure: boolean) => {
+        if (areYouSure){
+            failRequestHistory.setState([]).store()
+            this._log('Fail history erased')
+        }
     }
 
     addPair = controller.addPair
@@ -221,10 +243,21 @@ export class PolyPrice {
         const interval = (1 / controller.getMaxRequestCountPerSecond()) * FETCH_BATCH_SIZE
 
         this._intervalPairPriceFetch = setInterval(async () => {
-            const count = failRequestHistory.count()
-            await controller.refreshOrClearPair(FETCH_BATCH_SIZE)
-            if (count < failRequestHistory.count())
-                failRequestHistory.action().store()
+            
+            let hasFailedOnce = false
+            const selectedPairs = controller.pairList.filterByPriceFetchRequired().slice(0, FETCH_BATCH_SIZE) as PairList
+            const res = await Promise.all(controller.refreshOrClearPair(selectedPairs))
+            
+            if (!this._hasOptimizationBoxOpen){
+                res.forEach((r, idx: number) => {
+                    if (r && typeof r === 'object')
+                        (selectedPairs.nodeAt(idx) as Pair).get().priceHistoryList().action().store()
+                    else if (typeof r === 'number')
+                        hasFailedOnce = true                
+                })
+                hasFailedOnce && failRequestHistory.action().store()
+            }
+
         }, interval * 1000)
 
         this._log('Min pair price fetch interval is ' + (controller.getMinFetchInterval() / 1000).toFixed(1) + ' seconds')
