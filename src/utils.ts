@@ -1,5 +1,9 @@
 import fetch from "node-fetch-native";
 
+export const areSymbolsEqual = (symbol1: string, symbol2: string) => {
+    return symbol1.toLowerCase() === symbol2.toLowerCase()
+  }
+
 export const safeParsePrice = (price: any) =>{
     if (typeof price === 'number' && !isNaN(price)){
         return price 

@@ -93,6 +93,13 @@ class Controller {
         }
         this.printRegularLog('old price history purged')
     }
+    
+    removeAllPairs = () => {
+        this.pairList.setState([])
+        for (const key in this.priceHistoryMap){
+            this.priceHistoryMap[key].setState([])
+        }
+    }
 
     addPair = (symbol0: string, symbol1: string) => {
         const { pairList, priceHistoryMap } = this
@@ -147,6 +154,7 @@ class Controller {
         return null
     }
 
+
     refreshOrClearPair = (list: PairList) => {
         const ret: Promise<number | {
             cex: TCEX;
@@ -190,7 +198,7 @@ export class PolyPrice {
     private _options: PolyPriceOptions
     private _intervalPairPriceFetch: any
     private _intervalPairPriceHistoryRemove: any
-    private _cpuOtimizationEnabled = true
+    private _cpuOtimizationEnabled = false
 
     private _log = (...msg: any) => {
         if (this.options().fullLogginEnabled())
@@ -275,6 +283,8 @@ export class PolyPrice {
         clearInterval(this._intervalPairPriceHistoryRemove)
         this._log('Intervals cleared')
     }
+
+    removeAllPairs = controller.removeAllPairs
 
     run = async (minFetchInterval: number, maxRequestCountPerSecond: number) => {
         if (this._running)

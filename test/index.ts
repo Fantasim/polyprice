@@ -9,6 +9,7 @@ import { PriceHistory, PriceHistoryList } from '../src/models/price-history';
 import { FailHistory, failRequestHistory } from '../src/models/fail-history';
 
 import { runExchangeTests } from './exchange'
+import { runPolyPriceTest } from './polyprice';
 
 const DB_PATH = './.db'
 
@@ -27,6 +28,9 @@ const main = () => {
             fs.existsSync(DB_PATH) && fs.rmdirSync(DB_PATH, { recursive: true })
             fs.mkdirSync(DB_PATH)
         })
+
+        runPolyPriceTest(poly)
+
 
         it('Poly sync DB', async () => {
             await poly.run(5000_000, 0.1)

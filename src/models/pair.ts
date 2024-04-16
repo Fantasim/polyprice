@@ -3,7 +3,7 @@ import { IPriceHistory, PriceHistory, PriceHistoryList } from './price-history';
 import { failRequestHistory } from './fail-history';
 import { CEXList, TCEX } from './cex';
 import { RETRY_LOOKING_FOR_PAIR_INTERVAL, UNFOUND_PAIR_ERROR_CODE } from '../constant';
-import { buildKey } from '../utils';
+import { areSymbolsEqual, buildKey } from '../utils';
 import { controller } from '../polyprice';
 
 interface IPairState {
@@ -85,7 +85,7 @@ export class PairList extends Collection {
     }
 
     filterBySymbol = (symbol: string) => {
-        return this.filter((pair: Pair) => pair.get().symbol0() === symbol.toLowerCase() || pair.get().symbol1() === symbol.toLowerCase()) as PairList
+        return this.filter((pair: Pair) => areSymbolsEqual(pair.get().symbol0(), symbol) || areSymbolsEqual(pair.get().symbol1(), symbol)) as PairList
     }
 
     filterByPriceFetchRequired = () => {
